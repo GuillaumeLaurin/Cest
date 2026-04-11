@@ -1,0 +1,8 @@
+{
+  "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg-tool/main/docs/vcpkg.schema.json",
+  "name": "cest",
+  "description": "A header-only C++17 test library inspired by Jest",
+  "maintainers": "Guillaume Laurin <glaurin451@gmail.com>",
+  "supports": "!(uwp | arm | android | emscripten | osx | ios | xbox | freebsd | openbsd | wasm32)",
+  "dependencies": []
+}

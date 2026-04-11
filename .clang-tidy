@@ -1,0 +1,28 @@
+---
+Checks: >
+  clang-diagnostic-*,
+  llvm-else-after-return,
+  llvm-header-guard,
+  llvm-include-order,
+  llvm-namespace-comment,
+  llvm-qualified-auto,
+  llvm-use-ranges
+WarningsAsErrors: ''
+HeaderFileExtensions:
+  - ''
+  - h
+  - hh
+  - hpp
+  - hxx
+ImplementationFileExtensions:
+  - c
+  - cc
+  - cpp
+  - cxx
+HeaderFilterRegex: '.*'
+ExcludeHeaderFilterRegex: ''
+FormatStyle:     llvm
+CheckOptions:    {}
+SystemHeaders:   false
+...
+

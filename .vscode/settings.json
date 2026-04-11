@@ -1,0 +1,9 @@
+{
+    "[cpp]": {
+        "editor.defaultFormatter": "xaver.clang-format"
+    },
+    "editor.formatOnSave": true,
+    "clang-format.executable": "C:\\Program Files\\LLVM\\bin\\clang-format.exe",
+    "editor.tabSize": 2,
+    "editor.detectIndentation": false
+}
