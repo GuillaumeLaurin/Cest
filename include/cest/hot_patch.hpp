@@ -73,12 +73,12 @@ inline void writeJump(uint8_t *dst, void *target) {
   const uint32_t brX16 = 0xD61F0200;
   std::memcpy(dst + 0, &ldrX16, 4);
   std::memcpy(dst + 4, &brX16, 4);
-  uint16_t = reinterpret_cast<uint64_t>(target);
+  uint64_t t = reinterpret_cast<uint64_t>(target);
   std::memcpy(dst + 8, &t, 8);
 }
 inline void flushICache(void *addr, size_t len) {
   __builtin___clear_cache(static_cast<char *>(addr),
-                          static_cast<char *>(addr + len));
+                          static_cast<char *>(addr) + len);
 }
 
 #else
