@@ -15,8 +15,9 @@ concurrency:
 jobs:
   # ---------------------------------------------------------------------------
   # Build and run the self-test on every supported platform + compiler.
-  # Windows is intentionally excluded: the hotpatch module does not support it
-  # yet, and hotpatch tests are not part of the CI surface anyway.
+  # The hotpatch module is compiled out everywhere (it is not part of the CI
+  # surface yet), so Windows/MSVC can build the rest of the library without
+  # needing hotpatch support.
   # ---------------------------------------------------------------------------
   build-and-test:
     name: ${{ matrix.os }} / ${{ matrix.compiler }} / ${{ matrix.build_type }}
@@ -54,11 +55,20 @@ jobs:
             cxx: clang++
             build_type: Debug
 
+          # Windows — MSVC, Debug and Release.
+          - os: windows-latest
+            compiler: msvc
+            build_type: Debug
+          - os: windows-latest
+            compiler: msvc
+            build_type: Release
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up compiler
+      - name: Set up compiler (POSIX)
+        if: runner.os != 'Windows'
         run: |
           echo "CC=${{ matrix.cc }}"   >> $GITHUB_ENV
           echo "CXX=${{ matrix.cxx }}" >> $GITHUB_ENV
@@ -70,16 +80,24 @@ jobs:
           -DCEST_BUILD_EXAMPLE=ON
 
       - name: Build
-        run: cmake --build build --parallel
+        run: cmake --build build --config ${{ matrix.build_type }} --parallel
 
-      - name: Run self-test
+      - name: Run self-test (POSIX)
+        if: runner.os != 'Windows'
         run: ./build/example
         env:
-          NO_COLOR: "1"   # keep CI logs readable
+          NO_COLOR: "1"
+
+      - name: Run self-test (Windows)
+        if: runner.os == 'Windows'
+        run: .\build\${{ matrix.build_type }}\example.exe
+        env:
+          NO_COLOR: "1"
 
   # ---------------------------------------------------------------------------
   # Strict warnings: build once with -Wall -Wextra -Wpedantic -Werror to catch
-  # anything the permissive matrix lets through. Single job, fast, high signal.
+  # anything the permissive matrix lets through. GCC on Linux — MSVC has its
+  # own warning set and is checked by the main build-and-test matrix.
   # ---------------------------------------------------------------------------
   strict-warnings:
     name: Strict warnings (GCC -Werror)
@@ -104,7 +122,8 @@ jobs:
 
   # ---------------------------------------------------------------------------
   # Sanitizers: catch memory errors, UB, and data races that the regular build
-  # won't flag. Clang on Linux is the cheapest and most reliable combo.
+  # won't flag. Clang on Linux is the cheapest and most reliable combo; MSVC's
+  # sanitizer story is not worth the integration pain for this project.
   # ---------------------------------------------------------------------------
   sanitizers:
     name: Sanitizers (${{ matrix.sanitizer }})
