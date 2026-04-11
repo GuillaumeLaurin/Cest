@@ -143,7 +143,7 @@ template <typename Fn> HotpatchGuard hotpatch(Fn *target, Fn *replacement) {
   std::vector<uint8_t> saved(detail::kPatchSize);
 
   detail::withRwx(t, detail::kPatchSize, [&] {
-    std::memcpy(saved.data(), t, detail::KPatchSize);
+    std::memcpy(saved.data(), t, detail::kPatchSize);
     detail::writeJump(static_cast<uint8_t *>(t), r);
   });
 
