@@ -183,7 +183,7 @@ public:
     }
     if (ok == Negated) {
       std::ostringstream os;
-      os << "expect(Function)" << (negated_ ? ".not." : ".")
+      os << "expect(Function)" << (Negated ? ".not." : ".")
          << "toThrowType<E>()";
       throw AssertionError(os.str());
     }

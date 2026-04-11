@@ -159,7 +159,7 @@ public:
   MockFn() : Value(std::make_shared<State>()) {}
 
   MockFn &mockImplementation(ImplType impl) {
-    std::lock_guard<std::mutext> g(Value->Mutex);
+    std::lock_guard<std::mutex> g(Value->Mutex);
     Value->Impl = std::move(impl);
     return *this;
   }
