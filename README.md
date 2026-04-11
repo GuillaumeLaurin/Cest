@@ -66,10 +66,10 @@ No inheritance, no vtable, zero-cost in production. Parameterize your code by a 
 ```cpp
 template <typename Sender>
 class Notifier {
-    Sender send_;
+    Sender Value;
 public:
-    explicit Notifier(Sender s) : send_(std::move(s)) {}
-    void notify(std::string user, std::string msg) { send_(user, msg); }
+    explicit Notifier(Sender sender) : Value(std::move(sender)) {}
+    void notify(std::string user, std::string msg) { Value(user, msg); }
 };
 
 // In a test:
@@ -101,7 +101,7 @@ real_multiply(6, 7);      // -> 42 (restored)
 **Caveats to know about:**
 
 - The target function **must** be non-inlined. Compile with `-O0 -fno-inline`, or mark it `__attribute__((noinline))`, or put it in a separate TU built without optimization.
-- Does not work on Windows in this build (you would need `VirtualProtect` + x64 encoding — easy to add, omitted to keep the library simple).
+- Does not work on Windows in this build. Windows support is on the roadmap but not implemented; the hotpatch module is **not part of the CI test surface** yet.
 - Not thread-safe during the patch itself.
 - No "call original" from the replacement: this is a replace-and-restore, not a full detour trampoline.
 
@@ -114,7 +114,7 @@ The original design goal was "cross-platform" + "mock everything (even non-virtu
 ```bash
 mkdir build && cd build
 cmake .. && cmake --build .
-./cest_example
+./example
 ```
 
 Or by hand:
@@ -123,3 +123,65 @@ Or by hand:
 g++ -std=c++17 -O0 -fno-inline -I include examples/example.cpp -o example
 ./example
 ```
+
+## Contributing
+
+Contributions are welcome. Please read this section before opening a pull request — it will save both of us a review cycle.
+
+### Coding style
+
+`cest` follows the [LLVM Coding Standards](https://llvm.org/docs/CodingStandards.html) with **one deliberate exception**: `iostream` is allowed. LLVM forbids it for binary-size and static-initialization-order reasons, but a test framework that prints coloured output to a terminal has no realistic alternative, and the `Runner` owns its stream lifetime so the traditional concerns don't apply here. Do not use `iostream` in code paths that aren't reporter output.
+
+Everything else follows LLVM. The points that come up most often in review:
+
+- **Names.** Types, classes, and variables use `PascalCase` (`HookCounters`, `BeforeAllOuter`, `Value`). Functions and methods use `camelCase` (`runSuite`, `mockReturnValue`). Macros are `CEST_UPPER_SNAKE_CASE`. Global variables are prefixed with `G` (`GHooks`). Member variables have no prefix — no `m_`, no trailing underscore.
+- **`auto`.** Use `auto` only when the type is either obvious from the right-hand side (iterators, lambda returns, `make_*` factories) or genuinely too verbose to spell. `auto x = 42;` is wrong; `auto it = map.find(key);` is right.
+- **Early returns.** Prefer them to nested `if`s. Reduce indentation; keep the happy path at the leftmost column.
+- **No exceptions for control flow.** Exceptions are reserved for `AssertionError` and for errors the user should see at the top level. Do not use them to signal "not found" or similar expected conditions.
+- **`const` everywhere it applies.** Parameters, locals, methods.
+- **Include order.** Corresponding header first, then a blank line, then C++ standard library headers, then third-party, then project headers. Each group alphabetized.
+- **Braces.** Attached, LLVM-style: `if (x) {`, not `if (x)\n{`.
+- **Line length.** 80 columns. This is not negotiable for new code. Existing code that violates it can be reformatted in the same patch that touches it, but do not submit drive-by reformats.
+
+When in doubt, read a neighbouring file and match it. If the neighbouring file is wrong, fix it in a dedicated commit, not bundled with a feature.
+
+### Commits and pull requests
+
+- **One logical change per PR.** "Fix hotpatch on ARM64 and also rename three variables and also add a matcher" is three PRs. Reviewers will ask you to split it.
+- **Commit messages.** First line is a short imperative summary, 72 columns max, no trailing period. Blank line. Body explains *why*, not *what* — the diff shows what. Wrap at 72 columns.
+    ```
+    Fix beforeEach ordering in nested suites
+
+    runSuite() was passing effectiveBefore to children instead of
+    rebuilding the chain from inherited + s.BeforeEach. This caused
+    the inner beforeEach to run twice on deeply nested suites.
+
+    Fixes #42.
+    ```
+- **Link the issue.** If a PR fixes an open issue, say `Fixes #N` in the commit body so GitHub auto-closes it on merge.
+- **Tests are required for behavioural changes.** A bug fix must come with a test that fails before the fix and passes after. A new matcher must come with tests for both the positive and the negated (`.Not()`) form. A new feature must come with at least one usage test in `examples/example.cpp`.
+- **Documentation changes alongside code changes.** If you add a public API, update the README in the same PR. Documentation drift is worse than no documentation.
+- **CI must be green before review.** PRs with a red CI will be ignored until they are green. If CI is flaky (not your fault), comment on the PR and re-run; don't silently push a merge commit.
+
+### What to work on
+
+The [ROADMAP.md](ROADMAP.md) lists everything that's on the table. If you want to tackle something, open an issue first saying *which* item and *how* you plan to approach it — this avoids two people working on the same feature in parallel. Small, isolated items (new matchers, docstring improvements, build-system cleanups) don't need a prior issue; just open the PR.
+
+Things that will be rejected on sight, no matter how well-written:
+
+- Mass reformats of existing code.
+- Renames that don't serve a clear purpose.
+- New dependencies. `cest` is header-only and self-contained. It will stay that way.
+- Anything that adds a virtual base class or inheritance requirement to the mock module. The "no inheritance" constraint is load-bearing, not incidental.
+- Features that duplicate what an external tool already does well (see ROADMAP section 5 — coverage reporting is CMake glue around `llvm-cov`, not a custom collector).
+
+### Reporting bugs
+
+Open an issue with:
+
+1. Compiler, version, and OS (`g++ --version`, `clang++ --version`, `cl`).
+2. The smallest `TEST_SUITE` that reproduces the problem. Ideally one that fits in a comment.
+3. What you expected to see, and what you actually saw. Full output, not a paraphrase.
+4. Whether you ran with `NO_COLOR=1` (ANSI escapes in a bug report are hard to read).
+
+A bug report that's missing any of these will get a request for more information before anyone looks at the substance.

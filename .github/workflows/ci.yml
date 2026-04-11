@@ -1,0 +1,139 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+# Cancel in-progress runs on the same branch when a new commit arrives.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Build and run the self-test on every supported platform + compiler.
+  # Windows is intentionally excluded: the hotpatch module does not support it
+  # yet, and hotpatch tests are not part of the CI surface anyway.
+  # ---------------------------------------------------------------------------
+  build-and-test:
+    name: ${{ matrix.os }} / ${{ matrix.compiler }} / ${{ matrix.build_type }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Linux — GCC and Clang, Debug and Release.
+          - os: ubuntu-latest
+            compiler: gcc
+            cc: gcc
+            cxx: g++
+            build_type: Debug
+          - os: ubuntu-latest
+            compiler: gcc
+            cc: gcc
+            cxx: g++
+            build_type: Release
+          - os: ubuntu-latest
+            compiler: clang
+            cc: clang
+            cxx: clang++
+            build_type: Debug
+
+          # macOS — Apple Clang, both Intel and Apple Silicon runners.
+          - os: macos-13          # Intel
+            compiler: appleclang
+            cc: clang
+            cxx: clang++
+            build_type: Debug
+          - os: macos-latest      # Apple Silicon (arm64)
+            compiler: appleclang
+            cc: clang
+            cxx: clang++
+            build_type: Debug
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up compiler
+        run: |
+          echo "CC=${{ matrix.cc }}"   >> $GITHUB_ENV
+          echo "CXX=${{ matrix.cxx }}" >> $GITHUB_ENV
+
+      - name: Configure
+        run: >
+          cmake -B build
+          -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+          -DCEST_BUILD_EXAMPLE=ON
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Run self-test
+        run: ./build/example
+        env:
+          NO_COLOR: "1"   # keep CI logs readable
+
+  # ---------------------------------------------------------------------------
+  # Strict warnings: build once with -Wall -Wextra -Wpedantic -Werror to catch
+  # anything the permissive matrix lets through. Single job, fast, high signal.
+  # ---------------------------------------------------------------------------
+  strict-warnings:
+    name: Strict warnings (GCC -Werror)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure with strict flags
+        run: >
+          cmake -B build
+          -DCMAKE_BUILD_TYPE=Debug
+          -DCEST_BUILD_EXAMPLE=ON
+          -DCMAKE_CXX_FLAGS="-Wall -Wextra -Wpedantic -Werror -Wshadow -Wnon-virtual-dtor"
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Run
+        run: ./build/example
+        env:
+          NO_COLOR: "1"
+
+  # ---------------------------------------------------------------------------
+  # Sanitizers: catch memory errors, UB, and data races that the regular build
+  # won't flag. Clang on Linux is the cheapest and most reliable combo.
+  # ---------------------------------------------------------------------------
+  sanitizers:
+    name: Sanitizers (${{ matrix.sanitizer }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        sanitizer: [address, undefined, thread]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure
+        env:
+          CC: clang
+          CXX: clang++
+        run: >
+          cmake -B build
+          -DCMAKE_BUILD_TYPE=Debug
+          -DCEST_BUILD_EXAMPLE=ON
+          -DCMAKE_CXX_FLAGS="-fsanitize=${{ matrix.sanitizer }} -fno-omit-frame-pointer -g"
+          -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=${{ matrix.sanitizer }}"
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Run
+        run: ./build/example
+        env:
+          NO_COLOR: "1"
+          ASAN_OPTIONS: "detect_leaks=1:halt_on_error=1:abort_on_error=1"
+          UBSAN_OPTIONS: "halt_on_error=1:abort_on_error=1:print_stacktrace=1"
+          TSAN_OPTIONS: "halt_on_error=1"
