@@ -38,11 +38,6 @@ jobs:
             cxx: clang++
             build_type: Debug
 
-          - os: macos-13
-            compiler: appleclang
-            cc: clang
-            cxx: clang++
-            build_type: Debug
           - os: macos-latest
             compiler: appleclang
             cc: clang
