@@ -19,5 +19,7 @@ if (CEST_BUILD_EXAMPLES)
     add_executable(cest_example examples/example.cpp)
     target_link_libraries(cest_example PRIVATE cest)
     # Hot-patching requires the target function to NOT be inlined.
-    target_compile_options(cest_example PRIVATE -O0 -fno-inline)
+    if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
+      target_compile_options(cest_example PRIVATE -O0 -fno-inline)
+    endif ()
 endif ()
