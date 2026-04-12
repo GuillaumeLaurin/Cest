@@ -1,4 +1,4 @@
-function(cest_commun target)
+function(cest_common target)
   set(options EXPORT)
   set(oneValueArgs NAMESPACE NAME)
   cmake_parse_arguments(PARSE_ARGV 1 CEST "${options}" "${oneValueArgs}" "")

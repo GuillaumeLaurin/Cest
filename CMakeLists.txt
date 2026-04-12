@@ -19,7 +19,7 @@ cest_read_version(CEST_VERSION
 
 project(${Cest_ns}
   DESCRIPTION "A header-only C++17 test library inspired by Jest"
-  LANGUAGE CXX
+  LANGUAGES CXX
   VERSION ${CEST_VERSION}
 )
 
@@ -73,6 +73,7 @@ feature_option_environment(STRICT_MODE
   "Propagate strict compiler/linker options and Qt definitions using \
   the ${Cest_ns}::${CommonConfig_target} interface library to the user code \
   (highly recommended; can also be set with the CEST_STRICT_MODE environment variable)"
+  CEST_STRICT_MODE OFF
 )
 
 feature_option(VERBOSE_CONFIGURE
@@ -115,8 +116,10 @@ feature_option(CEST_EXAMPLE
 include(CestSources)
 cest_sources(${Cest_target}_headers)
 
-target_sources(${Cest_target} PRIVATE
-  ${${Cest_target}_headers}
+target_sources(${Cest_target} INTERFACE
+  FILE_SET HEADERS
+  BASE_DIRS ${PROJECT_SOURCE_DIR}/include
+  FILES ${${Cest_target}_headers}
 )
 
 # ---
@@ -236,7 +239,9 @@ if(BUILD_TREE_DEPLOY)
 endif()
 
 # ---
-set_package_properties()
+include(FeatureSummary)
+
+#set_packages_properties()
 
 if(VERBOSE_CONFIGURE)
   if(NOT CEST_IS_MULTI_CONFIG AND NOT CEST_BUILD_TYPE_LOWER STREQUAL "debug")

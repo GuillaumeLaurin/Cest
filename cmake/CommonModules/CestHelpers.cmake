@@ -122,13 +122,12 @@ function(cest_read_version out_version out_major out_minor out_patch out_tweak)
 
   message(DEBUG "Version file content - ${versionFileContent}")
 
-  set(regex ".+_MAJOR +([0-9]+);.+_MINOR +([0-9]+);.+_BUGFIX +([0-9]+);\
-      .+_BUILD +([0-9]+)")
+  set(regex ".+_MAJOR +([0-9]+);.+_MINOR +([0-9]+);.+_BUGFIX +([0-9]+);.+_BUILD +([0-9]+)")
   string(REGEX MATCHALL "${regex}" match "${versionFileContent}")
 
   if(NOT match)
     message(FATAL_ERROR "Could not detect project version number \
-            from ${versionHeader} in ${CMAKE_CURRENT_FUNCTION}().")
+            from ${CEST_VERSION_HEADER} in ${CMAKE_CURRENT_FUNCTION}().")
   endif()
 
   message(DEBUG "Matched version string - ${match}")

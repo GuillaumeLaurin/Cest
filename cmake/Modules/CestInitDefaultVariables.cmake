@@ -206,14 +206,9 @@ macro(cest_init_cest_variables)
             $<SHELL_PATH:${${Cest_ns}_BINARY_DIR}/tests/${CestUtils_ns}>${CEST_PATH_SEPARATOR}")
     else()
       if(CEST_IS_MULTI_CONFIG)
-        if(CEST_BUILD_LOADABLE_DRIVERS AND BUILD_MYSQL_DRIVER)
-          string(PREPEND CEST_TESTS_ENV "\
-                $<SHELL_PATH:${${Cest_ns}_BINARY_DIR}/drivers/mysql/$<CONFIG>>${CEST_PATH_SEPARATOR}")
-        endif()
         string(PREPEND CEST_TESTS_ENV "\
               $<SHELL_PATH:${${Cest_ns}_BINARY_DIR}/$<CONFIG>>${CEST_PATH_SEPARATOR}\
               $<SHELL_PATH:${${Cest_ns}_BINARY_DIR}/tests/${CestUtils_ns}/$<CONFIG>>${CEST_PATH_SEPARATOR}")
-        endif()
       else()
         string(PREPEND CEST_TESTS_ENV "\
               $<SHELL_PATH:${${Cest_ns}_BINARY_DIR}>${CEST_PATH_SEPARATOR}\
@@ -240,5 +235,6 @@ macro(cest_init_cest_variables)
         "Determine whether ${Cest_target} library will be built with extern or inline \
         constants.")
     unset(cestExternConstants)
+  endif()
 
 endmacro()

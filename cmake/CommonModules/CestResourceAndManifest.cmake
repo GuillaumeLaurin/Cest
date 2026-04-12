@@ -24,10 +24,14 @@ function(cest_resource_and_manifest target)
     set(CEST_OUTPUT_DIR "tmp/")
   endif()
 
+  if(NOT DEFINED CEST_RESOURCES_DIR)
+    set(CEST_RESOURCES_DIR "resources")
+  endif()
+
   file(REAL_PATH "${CEST_OUTPUT_DIR}" CEST_OUTPUT_DIR
        BASE_DIRECTORY "${PROJECT_BINARY_DIR}"
   )
-  file(REAL_PATH "${CEST_RESOURCES_DIR}" CEST_OUTPUT_DIR
+  file(REAL_PATH "${CEST_RESOURCES_DIR}" CEST_RESOURCES_DIR
        BASE_DIRECTORY "${PROJECT_SOURCE_DIR}"
   )
 
@@ -52,7 +56,7 @@ function(cest_resource_and_manifest target)
   set(pragma_codepage "65001")
 
   configure_file(
-    "${CEST_RESOURCE_DIR}/${rcBasename}.rc.in"
+    "${CEST_RESOURCES_DIR}/${rcBasename}.rc.in"
     "${CEST_OUTPUT_DIR}/${rcBasename}_genexp.rc.in"
     @ONLY NEWLINE_STYLE LF
   )
@@ -70,7 +74,7 @@ function(cest_resource_and_manifest target)
   endif()
 
   target_sources(${target} PRIVATE
-    "${CEST_RESOURCE_DIR}/${rcBasename}.rc.in"
+    "${CEST_RESOURCES_DIR}/${rcBasename}.rc.in"
     "${CEST_OUTPUT_DIR}/${rcBasename}_genexp.rc.in"
     "$<$<BOOL:$<CONFIG>>:${CEST_OUTPUT_DIR}/${rcBasename}-$<CONFIG>.rc>"
   )
