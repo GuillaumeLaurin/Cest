@@ -11,8 +11,7 @@ function(cest_install_cest)
   install(
     TARGETS ${Cest_target} ${CommonConfig_target}
     EXPORT CestTargets
-    INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
-    LIBRARY ARCHIVE RUNTIME
+    FILE_SET HEADERS DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
   )
 
   if(CEST_VCPKG)
