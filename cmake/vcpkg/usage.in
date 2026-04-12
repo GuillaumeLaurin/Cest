@@ -1,0 +1,4 @@
+The @CEST_PORT@ port provides the following CMake targets:
+
+find_package(@Cest_ns@ @cestPackageVersion@ CONFIG REQUIRED)
+target_link_libraries(main PRIVATE @Cest_ns@::@Cest_target@)
