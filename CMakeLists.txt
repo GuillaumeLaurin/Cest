@@ -43,13 +43,8 @@ cest_toolchain_requirement(
 
 include(FeatureSummary)
 include(CestFeatureOptions)
-include(CestOptions)
 
 cest_init_cmake_variables_pre()
-
-feature_option(BUILD_SHARED_LIBS
-  "Build using shared libraries" ON
-)
 
 feature_option(BUILD_TESTS
   "Build Cest unit tests" OFF
@@ -81,8 +76,6 @@ feature_option(VERBOSE_CONFIGURE
   output" OFF
 )
 
-cest_initialize_inline_constants_option()
-
 mark_as_advanced(MATCH_EQUAL_EXPORTED_BUILDTREE)
 
 # ---
@@ -102,7 +95,7 @@ cest_check_unsupported_build()
 
 # ---
 
-add_library(${Cest_target})
+add_library(${Cest_target} INTERFACE)
 add_library(${Cest_ns}::${Cest_target} ALIAS ${Cest_target})
 
 # ---
@@ -124,14 +117,6 @@ target_sources(${Cest_target} INTERFACE
 
 # ---
 
-target_precompile_headers(${Cest_target} PRIVATE $<$<COMPILE_LANGUAGE:CXX>:"pch.hpp">)
-
-if(NOT CMAKE_DISABLE_PRECOMPILE_HEADERS)
-  target_compile_definitions(${Cest_target} PRIVATE CEST_USING_PCH)
-endif()
-
-# ---
-
 set_target_properties(${Cest_target}
   PROPERTIES
     C_VISIBILITY_PRESET "hidden"
@@ -150,36 +135,19 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
 endif()
 
 target_include_directories(${Cest_target}
-  PUBLIC "$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>"
+  INTERFACE "$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>"
 )
 
 # ---
 
 target_compile_definitions(${Cest_target}
-  PUBLIC
+  INTERFACE
     PROJECT_CEST
     # Release build
     $<$<NOT:$<CONFIG:Debug>>:CEST_NO_DEBUG>
     # Debug build
     $<$<CONFIG:Debug>:CEST_DEBUG>
-  PRIVATE
-    CEST_PRAGMA_SYSTEM_HEADER_OFF
 )
-
-if(BUILD_SHARED_LIBS)
-  target_compile_definitions(${Cest_target}
-    PRIVATE
-      CEST_BUILDING_SHARED
-    INTERFACE
-      CEST_LINKING_SHARED
-  )
-endif()
-
-if(CEST_EXTERN_CONSTANTS)
-  target_compile_definitions(${Cest_target} PUBLIC CEST_EXTERN_CONSTANTS)
-else()
-  target_compile_definitions(${Cest_target} PUBLIC CEST_INLINE_CONSTANTS)
-endif()
 
 if(BUILD_TESTS)
   target_compile_definitions(${Cest_target} PUBLIC CEST_TESTS_CODE)
@@ -210,7 +178,7 @@ if(STRICT_MODE)
   )
 else()
   target_link_libraries(${Cest_target}
-    PRIVATE ${Cest_ns}::${CommonConfig_target}
+    INTERFACE ${Cest_ns}::${CommonConfig_target}
   )
 endif()
 

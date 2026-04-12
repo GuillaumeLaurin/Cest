@@ -176,7 +176,7 @@ endfunction()
 
 function(cest_build_tree_deployment)
 
-  if(CEST_VCPKG OR (NOT MSVC AND NOT MINGW) OR NOT BUILD_SHARED_LIBS)
+  if(CEST_VCPKG OR (NOT MSVC AND NOT MINGW))
     return()
   endif()
 

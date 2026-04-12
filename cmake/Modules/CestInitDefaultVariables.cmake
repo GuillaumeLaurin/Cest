@@ -223,18 +223,6 @@ macro(cest_init_cest_variables)
       set(CEST_VCPKG FALSE)
       set(CEST_PORT CEST_PORT-NOTFOUND)
     endif()
-
-    if(BUILD_SHARED_LIBS AND NOT INLINE_CONSTANTS)
-        set(CestExternConstants ON)
-        message(VERBOSE "Using extern constants")
-    else()
-        set(CestExternConstants OFF)
-        message(VERBOSE "Using inline constants")
-    endif()
-    set(CEST_EXTERN_CONSTANTS ${cestExternConstants} CACHE INTERNAL
-        "Determine whether ${Cest_target} library will be built with extern or inline \
-        constants.")
-    unset(cestExternConstants)
   endif()
 
 endmacro()
