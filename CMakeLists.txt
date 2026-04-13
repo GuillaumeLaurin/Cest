@@ -149,10 +149,6 @@ target_compile_definitions(${Cest_target}
     $<$<CONFIG:Debug>:CEST_DEBUG>
 )
 
-if(BUILD_TESTS)
-  target_compile_definitions(${Cest_target} PUBLIC CEST_TESTS_CODE)
-endif()
-
 # ---
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
