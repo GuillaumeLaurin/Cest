@@ -2,16 +2,16 @@ vcpkg_from_github(
     OUT_SOURCE_PATH SOURCE_PATH
     REPO GuillaumeLaurin/Cest
     #REF "v${VERSION}"
-    REF 74967f7d5b1741c8c6e23fff710d98995fc0b091
-    SHA512 37459cc48df8cd719c36b72ab0c4de2c6b2d39e48e65fd22a8081d1df462ac51eefeb950861c4431f14f62540e48e48550d138a9d03c443478b585c7e40d6fb9
+    REF 63613f061cef18fef635d72af9cdacd9d3e64fc0
+    SHA512 9db6b069eeed5ba18140f620ded7f383bc77a91f3e24cd347377aa45c7ea116524c5de40ed34a819e7d3ba46e649d230b3a09e4477c8f139f5dee5b974c1729a
     HEAD_REF main
 )
 
-vcpkg_check_features(
-    OUT_FEATURE_OPTIONS FEATURE_OPTIONS
-    PREFIX CEST
-    # FEATURES
-)
+# vcpkg_check_features(
+#     OUT_FEATURE_OPTIONS FEATURE_OPTIONS
+#     PREFIX CEST
+#     FEATURES
+# )
 
 set(CEST_CMAKE_OPTIONS)
 if("debug" IN_LIST FEATURES)
@@ -34,6 +34,10 @@ vcpkg_cmake_configure(
 
 vcpkg_cmake_install()
 
+file(REMOVE_RECURSE "${CURRENT_PACKAGES_DIR}/debug/include")
+
 vcpkg_cmake_config_fixup()
 
-vcpkg_install_copyright(FILE_LIST "${SOURCE_PATH}/LICENSE")
+file(REMOVE_RECURSE "${CURRENT_PACKAGES_DIR}/debug")
+
+vcpkg_install_copyright(FILE_LIST "${SOURCE_PATH}/LICENSE.md")
