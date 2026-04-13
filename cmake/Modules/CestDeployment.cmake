@@ -30,13 +30,9 @@ function(cest_install_cest)
     return()
   endif()
 
-  install(DIRECTORY "include/cest"
-    TYPE INCLUDE
-    FILES_MATCHING PATTERN "*.hpp"
-  )
   if(NOT CEST_VCPKG)
     install(DIRECTORY "docs/" DESTINATION "${CMAKE_INSTALL_DOCDIR}/mdx")
-    install(FILES AUTHORS LICENSE TYPE DOC)
+    install(FILES AUTHORS LICENSE.md TYPE DOC)
     install(FILES NOTES.txt TYPE DOC RENAME NOTES)
     install(FILES README.md TYPE DOC RENAME README)
   else()
@@ -65,7 +61,7 @@ function(cest_install_cest)
 
   configure_package_config_file(
     "cmake/CestConfig.cmake.in"
-    "${CEST_BUILD_INSTALLTREEDIR}/CestConfig.cmake"
+    "${PROJECT_BINARY_DIR}/${CEST_BUILD_INSTALLTREEDIR}/CestConfig.cmake"
     INSTALL_DESTINATION "${cest_config_package_dir}"
     PATH_VARS
     BIN_INSTALL_DIR CONFIG_INSTALL_DIR DOC_INSTALL_DIR INCLUDE_INSTALL_DIR
@@ -77,7 +73,7 @@ function(cest_install_cest)
   )
 
   write_basic_package_version_file(
-    "${CEST_BUILD_INSTALLTREEDIR}/CestConfigVersion.cmake.in"
+    "${PROJECT_BINARY_DIR}/${CEST_BUILD_INSTALLTREEDIR}/CestConfigVersion.cmake.in"
     COMPATIBILITY SameMajorVersion
   )
 
@@ -89,7 +85,7 @@ function(cest_install_cest)
 
   configure_file(
     "${PROJECT_BINARY_DIR}/${CEST_BUILD_INSTALLTREEDIR}/CestConfigVersion.cmake.in"
-    "${CEST_BUILD_INSTALLTREEDIR}/CestConfigVersion.cmake"
+    "${PROJECT_BINARY_DIR}/${CEST_BUILD_INSTALLTREEDIR}/CestConfigVersion.cmake"
     @ONLY NEWLINE_STYLE LF
   )
 

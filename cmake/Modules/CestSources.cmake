@@ -14,7 +14,7 @@ function(cest_sources out_headers)
   list(SORT headers)
   list(SORT sources)
 
-  list(TRANSFORM headers PREPEND "include/cest/")
+  list(TRANSFORM headers PREPEND "include/")
 
   set(${out_headers} ${headers} PARENT_SCOPE)
 
