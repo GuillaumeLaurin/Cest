@@ -184,6 +184,9 @@ macro(cest_init_cest_variables)
     to generate find_dependency() calls for the Cest package configuration file."
   )
 
+  set(CEST_BUILD_GENDIR "${Cest_ns}_generated" CACHE INTERNAL
+        "Generated content in the build tree.")
+
   # Setup the correct PATH environment variable used by the ctest command
   # To debug these paths on the PATH environment variable run ctest --debug
   if(BUILD_TESTS)
@@ -215,9 +218,6 @@ macro(cest_init_cest_variables)
               $<SHELL_PATH:${${Cest_ns}_BINARY_DIR}/tests/${CestUtils_ns}>${CEST_PATH_SEPARATOR}")
       endif()
     endif()
-
-    set(CEST_BUILD_GENDIR "${Cest_ns}_generated" CACHE INTERNAL
-        "Generated content in the build tree.")
 
     if(NOT CEST_VCPKG)
       set(CEST_VCPKG FALSE)

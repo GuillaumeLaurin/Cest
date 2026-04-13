@@ -7,7 +7,10 @@ set(CEST_BUILD_BUILDTREEDIR "${CEST_BUILD_GENDIR}/buildtree" CACHE INTERNAL
 set(CEST_BUILD_INSTALLTREEDIR "${CEST_BUILD_GENDIR}/installtree" CACHE INTERNAL
     "Generated content in the build tree for the install tree.")
 
-function(cest_install_cest) 
+function(cest_install_cest)
+  message(STATUS "PROJECT_BINARY_DIR = ${PROJECT_BINARY_DIR}")
+  message(STATUS "CEST_BUILD_INSTALLTREEDIR = ${CEST_BUILD_INSTALLTREEDIR}")
+  message(STATUS "Full path = ${PROJECT_BINARY_DIR}/${CEST_BUILD_INSTALLTREEDIR}/usage") 
   install(
     TARGETS ${Cest_target} ${CommonConfig_target}
     EXPORT CestTargets
@@ -105,7 +108,7 @@ function(cest_install_cest_vcpkg)
     "${CEST_VERSION_MAJOR}.${CEST_VERSION_MINOR}.${CEST_VERSION_PATCH}"
   )
   configure_file("cmake/vcpkg/usage.in"
-    "${CEST_BUILD_INSTALLTREEDIR}/usage"
+    "${PROJECT_BINARY_DIR}/${CEST_BUILD_INSTALLTREEDIR}/usage"
     @ONLY NEWLINE_STYLE LF
   )
 
