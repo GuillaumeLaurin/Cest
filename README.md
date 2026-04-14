@@ -25,6 +25,49 @@ Compile with `-std=c++17 -I include`, run the binary, and you get Jest-style col
 
 `toBe`, `toEqual`, `toBeTruthy`, `toBeFalsy`, `toBeGreaterThan`, `toBeLessThan`, `toContain`, `toThrow`, and `.Not()` for negation (C++ does not let you use `not` as an identifier in every context, hence the capitalized `Not()`).
 
+## Skipping tests and suites
+
+Both `it` and `describe` support a `.skip()` call that marks a test or an entire suite as skipped. Skipped items appear in yellow in the output and are counted separately — they do not affect the pass/fail result.
+
+### `it.skip` — skip a single test
+
+```cpp
+describe("my suite", [] {
+    it("this runs", [] { expect(1).toBe(1); });
+
+    it.skip("this is skipped — body never executes", [] {
+        expect(false).toBeTruthy(); // never reached
+    });
+
+    it("this also runs", [] { expect(2).toBe(2); });
+});
+```
+
+Rules that `cest` enforces for skipped tests, matching Jest:
+
+- The test body is **never called**.
+- `beforeEach` / `afterEach` hooks are **not called** for the skipped test.
+- `beforeAll` / `afterAll` are unaffected — they still fire once for the suite.
+- Non-skipped siblings run normally.
+
+### `describe.skip` — skip an entire suite
+
+```cpp
+describe.skip("whole suite is skipped", [] {
+    it("will not run", [] { /* ... */ });
+
+    describe("nested inside skipped — also skipped", [] {
+        it("will not run either", [] { /* ... */ });
+    });
+});
+```
+
+Rules:
+
+- All tests directly inside the skipped suite are skipped.
+- All **nested** `describe` blocks inside the skipped suite are also skipped, recursively.
+- Sibling `describe` blocks at the same level are **not** affected.
+
 ## Lifecycle hooks
 
 All four Jest hooks are supported with the usual semantics:
