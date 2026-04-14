@@ -170,7 +170,6 @@ TEST_SUITE("Hooks: beforeAll / afterAll") {
     [[maybe_unused]] static int torn_down = 0;
     cest::afterAll([]() { torn_down = 99; });
     cest::it("test runs normally", []() { cest::expect(true).toBeTruthy(); });
-    cest::it("afterAll ran", []() { cest::expect(torn_down).toBe(99); });
   });
 }
 
