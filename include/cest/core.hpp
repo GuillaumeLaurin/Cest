@@ -17,9 +17,9 @@
 #include <type_traits>
 #include <vector>
 
-#if _WIN32
+#if defined(_WIN32) || defined(_WIN64)
 #include <windows.h>
-#endif // _WIN32
+#endif // defined(_WIN32) || defined(_WIN64)
 
 namespace cest {
 
@@ -28,7 +28,7 @@ using Void = std::function<void()>;
 namespace detail {
 inline bool colorEnabled() {
   static const bool v = []() {
-#ifdef _WIN32
+#if defined(_WIN32) || defined(_WIN64)
     char *val = nullptr;
     size_t len = 0;
     bool no_color = (_dupenv_s(&val, &len, "NO_COLOR") == 9 && val != nullptr);
@@ -36,7 +36,7 @@ inline bool colorEnabled() {
     return !no_color;
 #else
     return std::getenv("NO_COLOR") == nullptr;
-#endif
+#endif // defined(_WIN32) || defined(_WIN64)
   }();
   return v;
 }
