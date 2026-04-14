@@ -207,6 +207,7 @@ struct TestCase {
   std::string Name;
   Void Function;
   bool Skipped = false;
+  bool Only = false;
 };
 
 struct Suite {
@@ -218,6 +219,7 @@ struct Suite {
   std::vector<Void> BeforeEach;
   std::vector<Void> AfterEach;
   bool Skipped = false;
+  bool Only = false;
 };
 
 class Runner {
@@ -230,13 +232,14 @@ public:
   void beginDescribe(const std::string &name) {
     Suite s;
     s.Name = name;
-    if (currentSuite().Skipped) {
-      s.Skipped = true;
-    }
+    s.Skipped = currentSuite().Skipped;
+    s.Only = currentSuite().Only;
     Stack.push_back(std::move(s));
   }
 
   void skipSuite() { currentSuite().Skipped = true; }
+
+  void makeSuiteOnly() { currentSuite().Only = true; }
 
   void endDescribe() {
     Suite s = std::move(Stack.back());
@@ -245,15 +248,19 @@ public:
   }
 
   void addTest(const std::string &name, Void function) {
-    if (!currentSuite().Skipped) {
-      currentSuite().Tests.push_back({name, function});
-    } else {
-      skipTest(name, std::move(function));
-    }
+    bool isOnly = currentSuite().Only;
+    bool isSkipped = currentSuite().Skipped;
+    currentSuite().Tests.push_back({name, function, isSkipped, isOnly});
   }
 
   void skipTest(const std::string &name, Void function) {
-    currentSuite().Tests.push_back({name, function, true});
+    bool isOnly = currentSuite().Only;
+    currentSuite().Tests.push_back({name, function, true, isOnly});
+  }
+
+  void makeTestOnly(const std::string &name, Void function) {
+    bool isSkipped = currentSuite().Skipped;
+    currentSuite().Tests.push_back({name, function, isSkipped, true});
   }
 
   void addBeforeAll(Void function) {
@@ -441,6 +448,13 @@ private:
       }
     }
   }
+
+  // void searchOnly(const Suite &s) {
+  //   // pass on the graph
+
+  //   // 1. if there is .Only (TC or S)
+  //   // 1.1 append Suite or test to the new graph
+  // }
 };
 
 namespace methods {
@@ -452,6 +466,8 @@ public:
   virtual void operator()(const std::string &name, const Void &body) = 0;
 
   virtual void skip(const std::string &name, const Void &body) = 0;
+
+  virtual void only(const std::string &name, const Void &body) = 0;
 };
 
 class It : public cest::methods::Block {
@@ -464,6 +480,10 @@ public:
 
   virtual void skip(const std::string &name, const Void &body) override {
     Runner::instance().skipTest(name, body);
+  }
+
+  virtual void only(const std::string &name, const Void &body) override {
+    Runner::instance().makeTestOnly(name, body);
   }
 };
 
@@ -480,6 +500,13 @@ public:
   virtual void skip(const std::string &name, const Void &body) override {
     Runner::instance().beginDescribe(name);
     Runner::instance().skipSuite();
+    body();
+    Runner::instance().endDescribe();
+  }
+
+  virtual void only(const std::string &name, const Void &body) override {
+    Runner::instance().beginDescribe(name);
+    Runner::instance().makeSuiteOnly();
     body();
     Runner::instance().endDescribe();
   }
