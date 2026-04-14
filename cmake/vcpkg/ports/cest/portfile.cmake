@@ -1,0 +1,42 @@
+vcpkg_from_github(
+    OUT_SOURCE_PATH SOURCE_PATH
+    REPO GuillaumeLaurin/Cest
+    REF "v${VERSION}"
+    SHA512 9db6b069eeed5ba18140f620ded7f383bc77a91f3e24cd347377aa45c7ea116524c5de40ed34a819e7d3ba46e649d230b3a09e4477c8f139f5dee5b974c1729a
+    HEAD_REF main
+)
+
+# vcpkg_check_features(
+#     OUT_FEATURE_OPTIONS FEATURE_OPTIONS
+#     PREFIX CEST
+#     FEATURES
+# )
+
+set(CEST_CMAKE_OPTIONS)
+if("debug" IN_LIST FEATURES)
+    list(APPEND CEST_CMAKE_OPTIONS --log-level=DEBUG --log-context)
+endif()
+
+vcpkg_cmake_configure(
+  SOURCE_PATH "${SOURCE_PATH}"
+  OPTIONS
+  ${CEST_CMAKE_OPTIONS}
+  -DCMAKE_CXX_SCAN_FOR_MODULES:BOOL=OFF
+  -DCMAKE_EXPORT_PACKAGE_REGISTRY:BOOL=OFF
+  -DBUILD_TESTS:BOOL=OFF
+  -DBUILD_TREE_DEPLOY:BOOL=OFF
+  -DCEST_PORT:STRING=${PORT}
+  -DCEST_VCPKG:BOOL=ON
+  -DVERBOSE_CONFIGURE:BOOL=ON
+  ${FEATURE_OPTIONS}
+)
+
+vcpkg_cmake_install()
+
+file(REMOVE_RECURSE "${CURRENT_PACKAGES_DIR}/debug/include")
+
+vcpkg_cmake_config_fixup()
+
+file(REMOVE_RECURSE "${CURRENT_PACKAGES_DIR}/debug")
+
+vcpkg_install_copyright(FILE_LIST "${SOURCE_PATH}/LICENSE.md")

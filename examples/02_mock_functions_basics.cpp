@@ -1,7 +1,3 @@
-// Self-test and usage examples.
-
-#define CEST_MAIN
-
 #include "cest.hpp"
 
 #include <memory>
@@ -9,43 +5,6 @@
 #include <vector>
 
 using namespace cest;
-
-TEST_SUITE(BasicMatcher) {
-  describe("expect() matchers", [] {
-    it("toBe compares equality", [] {
-      expect(2 + 2).toBe(4);
-      expect(std::string("hi")).toBe(std::string("hi"));
-    });
-
-    it("toBeTruthy / toBeFalsy", [] {
-      expect(1).toBeTruthy();
-      expect(0).toBeFalsy();
-    });
-
-    it("toBeGreaterThan / toBeLessThan", [] {
-      expect(10).toBeGreaterThan(3);
-      expect(3).toBeLessThan(10);
-    });
-
-    it("toContain works on vectors", [] {
-      std::vector<int> v{1, 2, 3};
-      expect(v).toContain(2);
-    });
-
-    it("not.toBe negates", [] { expect(1).Not().toBe(2); });
-
-    it("toThrow detects exceptions", [] {
-      expect(std::function<void()>([] {
-        throw std::runtime_error("x");
-      })).toThrow();
-      expect(std::function<void()>([] {
-        /* no throw */
-      }))
-          .Not()
-          .toThrow();
-    });
-  });
-}
 
 template <typename Sender> class Notifier {
 public:
@@ -124,16 +83,3 @@ TEST_SUITE(MockFunctionBasics) {
     });
   });
 }
-
-namespace {
-struct HookCounters {
-  int BeforeAllOuter = 0;
-  int AfterAllOuter = 0;
-  int BeforeEachOuter = 0;
-  int AfterEachOuter = 0;
-  int BeforeEachInner = 0;
-  int AfterEachInner = 0;
-  int LastValue = 0;
-};
-HookCounters GHooks;
-} // namespace

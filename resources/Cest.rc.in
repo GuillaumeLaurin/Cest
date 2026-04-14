@@ -1,0 +1,55 @@
+#pragma code_page(@pragma_codepage@)
+
+IDI_ICON1 ICON "icons/@Cest_target@.ico"
+
+#include <windows.h>
+#include "version.hpp"
+
+#define VER_FILEVERSION             CEST_VERSION_MAJOR,CEST_VERSION_MINOR,CEST_VERSION_BUGFIX,CEST_VERSION_BUILD
+#define VER_FILEVERSION_STR         CEST_FILEVERSION_STR "\0"
+
+#define VER_PRODUCTVERSION          CEST_VERSION_MAJOR,CEST_VERSION_MINOR,CEST_VERSION_BUGFIX,CEST_VERSION_BUILD
+#define VER_PRODUCTVERSION_STR      CEST_VERSION_STR "\0"
+
+#define VER_ORIGINALFILENAME_STR    "$<TARGET_FILE_NAME:@Cest_target@>\0"
+
+#ifdef CEST_NO_DEBUG
+#  define VER_DEBUG                 0
+#else
+#  define VER_DEBUG                 VS_FF_DEBUG
+#endif
+
+VS_VERSION_INFO VERSIONINFO
+    FILEVERSION    	VER_FILEVERSION
+    PRODUCTVERSION 	VER_PRODUCTVERSION
+    FILEFLAGSMASK  	VER_DEBUG
+    FILEFLAGS      	VER_DEBUG
+    FILEOS         	VOS__WINDOWS32
+    FILETYPE       	VFT_DLL
+    FILESUBTYPE    	VFT2_UNKNOWN
+    BEGIN
+        BLOCK "StringFileInfo"
+        BEGIN
+            BLOCK "040904B0"
+            BEGIN
+                VALUE "CompanyName",      "Atom Solution\0"
+                VALUE "FileDescription",  "A header-only C++17 test library inspired by Jest\0"
+                VALUE "FileVersion",      VER_FILEVERSION_STR
+                VALUE "InternalName",     "Cest\0"
+                VALUE "LegalCopyright",   "Copyright (©) 2026 Guillaume Laurin\0"
+                VALUE "ProductName",      "Cest\0"
+                VALUE "ProductVersion",   VER_PRODUCTVERSION_STR
+                VALUE "OriginalFilename", VER_ORIGINALFILENAME_STR
+            END
+        END
+
+        BLOCK "VarFileInfo"
+        BEGIN
+            VALUE "Translation", 0x409, 1200
+        END
+    END
+/* End of Version info */
+
+#ifdef __MINGW32__
+ISOLATIONAWARE_MANIFEST_RESOURCE_ID RT_MANIFEST "@Cest_target@$<TARGET_FILE_SUFFIX:@Cest_target@>.manifest"
+#endif

@@ -1,0 +1,77 @@
+# Config file for the @PROJECT_NAME@ package
+# It defines the @Cest_ns@::@Cest_target@ target to link against
+
+@PACKAGE_INIT@
+
+list(APPEND CMAKE_MESSAGE_CONTEXT @Cest_target@ CF)
+
+if(@cvf_is_multi_config@)
+    set(cest_build_type " Multi-Config")
+else()
+    set(cest_build_type " @CMAKE_BUILD_TYPE@")
+endif()
+
+message(STATUS "Found package ${CMAKE_FIND_PACKAGE_NAME} \
+        ${${CMAKE_FIND_PACKAGE_NAME}_VERSION}${cest_build_type} (requested \
+        ${${CMAKE_FIND_PACKAGE_NAME}_FIND_VERSION_COMPLETE}) at ${CMAKE_CURRENT_LIST_FILE}")
+unset(cest_build_type)
+
+# Info message about matching build type
+if(NOT isMultiConfig)
+  set(matchBuildType "disabled")
+  if(@MATCH_EQUAL_EXPORTED_BUILDTREE@)
+    set(matchBuildType "enabled")
+  endif()
+
+  message(VERBOSE "Matching build type for the @PROJECT_NAME@ \
+          ${${CMAKE_FIND_PACKAGE_NAME}_VERSION} package build tree was ${matchBuildType}")
+  unset(matchBuildType)
+endif()
+
+message(CHECK_START "Configuring @PROJECT_NAME@ package")
+list(APPEND CMAKE_MESSAGE_INDENT "  ")
+
+@cest_cmake_module_path@
+
+include(CMakeFindDependencyMacro)
+@cest_find_dependency_calls@
+
+@cest_target_includes@
+
+set(cest_map_release Release RelWithDebInfo MinSizeRel)
+set(cest_map_relwithdebinfo RelWithDebInfo Release MinSizeRel)
+set(cest_map_minsizerel MinSizeRel RelWithDebInfo Release)
+if(MSVC)
+  set(cest_map_debug Debug)
+else()
+  set(cest_map_debug Debug Debug RelWithDebInfo Release MinSizeRel)
+endif()
+
+set_target_properties(@Cest_ns@::@Cest_target@ PROPERTIES
+  MAP_IMPORTED_CONFIG_RELEASE "${cest_map_release}"
+  MAP_IMPORTED_CONFIG_RELWITHDEBINFO "${cest_map_relwithdebinfo}"
+  MAP_IMPORTED_CONFIG_MINSIZEREL "${cest_map_minsizerel}"
+  MAP_IMPORTED_CONFIG_DEBUG "${cest_map_debug}"
+)
+
+message(DEBUG "Setting CMAKE_MAP_IMPORTED_CONFIG_<CONFIG> for the \
+        @Cest_ns@::@Cest_target@ target to avoid link a release type builds against \
+        a debug build
+          * CMAKE_MAP_IMPORTED_CONFIG_RELEASE        = ${cest_map_release}
+          * CMAKE_MAP_IMPORTED_CONFIG_RELWITHDEBINFO = ${cest_map_relwithdebinfo}
+          * CMAKE_MAP_IMPORTED_CONFIG_MINSIZEREL     = ${cest_map_minsizerel}
+          * CMAKE_MAP_IMPORTED_CONFIG_DEBUG          = ${cest_map_debug}
+")
+
+unset(cest_map_release)
+unset(cest_map_relwithdebinfo)
+unset(cest_map_minsizerel)
+unset(cest_map_debug)
+
+check_required_components(@Cest_ns@)
+
+list(POP_BACK CMAKE_MESSAGE_INDENT)
+message(CHECK_PASS "done")
+
+list(POP_BACK CMAKE_MESSAGE_CONTEXT)
+list(POP_BACK CMAKE_MESSAGE_CONTEXT)

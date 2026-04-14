@@ -1,0 +1,1 @@
+Written by Guillaume Laurin  <glaurin451@gmail.com> Copyright (©) 2026
