@@ -459,11 +459,11 @@ public:
   virtual ~It() override = default;
 
   virtual void operator()(const std::string &name, const Void &body) override {
-    Runner::instance().addTest(name, std::move(body));
+    Runner::instance().addTest(name, body);
   }
 
   virtual void skip(const std::string &name, const Void &body) override {
-    Runner::instance().skipTest(name, std::move(body));
+    Runner::instance().skipTest(name, body);
   }
 };
 
