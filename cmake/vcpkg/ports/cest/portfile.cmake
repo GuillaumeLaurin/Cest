@@ -1,8 +1,7 @@
 vcpkg_from_github(
     OUT_SOURCE_PATH SOURCE_PATH
     REPO GuillaumeLaurin/Cest
-    #REF "v${VERSION}"
-    REF 63613f061cef18fef635d72af9cdacd9d3e64fc0
+    REF "v${VERSION}"
     SHA512 9db6b069eeed5ba18140f620ded7f383bc77a91f3e24cd347377aa45c7ea116524c5de40ed34a819e7d3ba46e649d230b3a09e4477c8f139f5dee5b974c1729a
     HEAD_REF main
 )
