@@ -177,7 +177,7 @@ public:
     bool ok = false;
     try {
       Function();
-    } catch (const E &e) {
+    } catch (const E &) {
       ok = true;
     } catch (...) {
     }

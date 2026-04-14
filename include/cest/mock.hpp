@@ -60,7 +60,7 @@ public:
     std::lock_guard<std::mutex> g(Value->Mutex);
     Value->Calls.clear();
     Value->OnceQueue.clear();
-    Value->DefaultReturn.clear();
+    Value->DefaultReturn.reset();
     Value->Impl = nullptr;
     return *this;
   }
@@ -167,8 +167,6 @@ public:
   MockFn &mockReset() {
     std::lock_guard<std::mutex> g(Value->Mutex);
     Value->Calls.clear();
-    Value->OnceQueue.clear();
-    Value->DefaultReturn.clear();
     Value->Impl = nullptr;
     return *this;
   }

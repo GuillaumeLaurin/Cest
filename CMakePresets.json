@@ -52,6 +52,19 @@
         "CMAKE_BUILD_TYPE": "Release",
         "CEST_EXAMPLE": "ON"
       }
+    },
+    {
+      "name": "x64-test",
+      "displayName": "x64 Test",
+      "inherits": "base",
+      "architecture": {
+        "value": "x64",
+        "strategy": "set"
+      },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "BUILD_TESTS": "ON"
+      }
     }
   ],
   "buildPresets": [
@@ -72,6 +85,23 @@
       "displayName": "x64 Examples",
       "configurePreset": "x64-examples",
       "configuration": "Release"
+    },
+    {
+      "name": "x64-test",
+      "displayName": "x64 Test",
+      "configurePreset": "x64-test",
+      "configuration": "Debug"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "x64-test",
+      "displayName": "x64 Test",
+      "configurePreset": "x64-test",
+      "configuration": "Debug",
+      "output": {
+        "outputOnFailure": true
+      }
     }
   ]
 }

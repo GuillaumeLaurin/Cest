@@ -43,7 +43,7 @@ function(cest_common target)
     if(NOT CEST_VCPKG)
       target_compile_options(${target} INTERFACE
         /W4
-        $<$<CONFIG:Debug>:/Wx /sdl>
+        $<$<CONFIG:Debug>:/WX /sdl>
       )
     endif()
 
