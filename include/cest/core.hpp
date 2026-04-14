@@ -44,6 +44,7 @@ inline bool colorEnabled() {
 inline const char *red() { return colorEnabled() ? "\033[31m" : ""; }
 inline const char *green() { return colorEnabled() ? "\033[32m" : ""; }
 inline const char *gray() { return colorEnabled() ? "\033[90m" : ""; }
+inline const char *yellow() { return colorEnabled() ? "\033[33m" : ""; }
 inline const char *bold() { return colorEnabled() ? "\033[1m" : ""; }
 inline const char *reset() { return colorEnabled() ? "\033[0m" : ""; }
 } // namespace detail
@@ -205,6 +206,7 @@ inline ThrowingExpectation expect(Void function) {
 struct TestCase {
   std::string Name;
   Void Function;
+  bool Skipped = false;
 };
 
 struct Suite {
@@ -215,6 +217,7 @@ struct Suite {
   std::vector<Void> AfterAll;
   std::vector<Void> BeforeEach;
   std::vector<Void> AfterEach;
+  bool Skipped = false;
 };
 
 class Runner {
@@ -227,8 +230,13 @@ public:
   void beginDescribe(const std::string &name) {
     Suite s;
     s.Name = name;
+    if (currentSuite().Skipped) {
+      s.Skipped = true;
+    }
     Stack.push_back(std::move(s));
   }
+
+  void skipSuite() { currentSuite().Skipped = true; }
 
   void endDescribe() {
     Suite s = std::move(Stack.back());
@@ -237,7 +245,15 @@ public:
   }
 
   void addTest(const std::string &name, Void function) {
-    currentSuite().Tests.push_back({name, function});
+    if (!currentSuite().Skipped) {
+      currentSuite().Tests.push_back({name, function});
+    } else {
+      skipTest(name, std::move(function));
+    }
+  }
+
+  void skipTest(const std::string &name, Void function) {
+    currentSuite().Tests.push_back({name, function, true});
   }
 
   void addBeforeAll(Void function) {
@@ -257,20 +273,22 @@ public:
   }
 
   int run() {
-    Passed = Failed = 0;
+    Passed = Failed = Skipped = 0;
     runSuite(Root, 0, {}, {});
     std::cout << "\n"
               << detail::bold() << "Results: " << detail::green() << Passed
               << " passed" << detail::reset() << ", "
               << (Failed ? detail::red() : detail::gray()) << Failed
-              << " failed" << detail::reset() << "\n";
+              << " failed" << detail::reset() << ", "
+              << (Skipped ? detail::yellow() : detail::gray()) << Skipped
+              << " skipped" << detail::reset() << "\n";
     return Failed == 0 ? 0 : 1;
   }
 
 private:
   Suite Root;
   std::vector<Suite> Stack;
-  int Passed = 0, Failed = 0;
+  int Passed = 0, Failed = 0, Skipped = 0;
 
   Runner() {
 #ifdef _WIN32
@@ -292,30 +310,41 @@ private:
                 HookList inheritedAfterEach) {
     if (!s.Name.empty()) {
       indent(depth);
-      std::cout << detail::bold() << s.Name << detail::reset() << "\n";
+      if (s.Skipped) {
+        std::cout << detail::bold() << detail::yellow() << s.Name
+                  << detail::reset() << "\n";
+      } else {
+        std::cout << detail::bold() << s.Name << detail::reset() << "\n";
+      }
     }
 
     int d = s.Name.empty() ? depth : depth + 1;
 
-    for (const auto &h : s.BeforeAll) {
-      try {
-        h();
-      } catch (const std::exception &e) {
-        indent(d);
-        std::cout << detail::red() << "beforeAll threw: " << e.what()
-                  << detail::reset() << "\n";
+    if (!s.Skipped) {
+      for (const auto &h : s.BeforeAll) {
+        try {
+          h();
+        } catch (const std::exception &e) {
+          indent(d);
+          std::cout << detail::red() << "beforeAll threw: " << e.what()
+                    << detail::reset() << "\n";
+        }
       }
     }
 
-    HookList effectiveBefore = inheritedBeforeEach;
-    for (const auto &h : s.BeforeEach)
-      effectiveBefore.push_back(h);
-
+    HookList effectiveBefore;
     HookList effectiveAfter;
-    for (const auto &h : s.AfterEach)
-      effectiveAfter.push_back(h);
-    for (const auto &h : inheritedAfterEach)
-      effectiveAfter.push_back(h);
+
+    if (!s.Skipped) {
+      effectiveBefore = inheritedBeforeEach;
+      for (const auto &h : s.BeforeEach)
+        effectiveBefore.push_back(h);
+
+      for (const auto &h : s.AfterEach)
+        effectiveAfter.push_back(h);
+      for (const auto &h : inheritedAfterEach)
+        effectiveAfter.push_back(h);
+    }
 
     for (const auto &t : s.Tests) {
       indent(d);
@@ -323,44 +352,51 @@ private:
       std::string errMsg;
       bool assertionErr = false;
 
-      for (const auto &h : effectiveBefore) {
-        try {
-          h();
-        } catch (const std::exception &e) {
-          ok = false;
-          errMsg = std::string("beforeEach threw: ") + e.what();
-          break;
-        }
-      }
+      if (!t.Skipped) {
 
-      if (ok) {
-        try {
-          t.Function();
-        } catch (const AssertionError &e) {
-          ok = false;
-          assertionErr = true;
-          errMsg = e.what();
-        } catch (const std::exception &e) {
-          ok = false;
-          errMsg = std::string("threw: ") + e.what();
-        } catch (...) {
-          ok = false;
-          errMsg = "unknown throw";
-        }
-      }
-
-      for (const auto &h : effectiveAfter) {
-        try {
-          h();
-        } catch (const std::exception &e) {
-          if (ok) {
+        for (const auto &h : effectiveBefore) {
+          try {
+            h();
+          } catch (const std::exception &e) {
             ok = false;
-            errMsg = std::string("afterEach threw: ") + e.what();
+            errMsg = std::string("beforeEach threw: ") + e.what();
+            break;
+          }
+        }
+
+        if (ok) {
+          try {
+            t.Function();
+          } catch (const AssertionError &e) {
+            ok = false;
+            assertionErr = true;
+            errMsg = e.what();
+          } catch (const std::exception &e) {
+            ok = false;
+            errMsg = std::string("threw: ") + e.what();
+          } catch (...) {
+            ok = false;
+            errMsg = "unknown throw";
+          }
+        }
+
+        for (const auto &h : effectiveAfter) {
+          try {
+            h();
+          } catch (const std::exception &e) {
+            if (ok) {
+              ok = false;
+              errMsg = std::string("afterEach threw: ") + e.what();
+            }
           }
         }
       }
 
-      if (ok) {
+      if (t.Skipped) {
+        std::cout << detail::yellow() << "Skipped " << t.Name << detail::reset()
+                  << "\n";
+        ++Skipped;
+      } else if (ok) {
         std::cout << detail::green() << "\xE2\x9C\x93 " << detail::reset()
                   << t.Name << "\n";
         ++Passed;
@@ -374,41 +410,85 @@ private:
       }
     }
 
-    // Recurse into children with extended hook chains.
-    HookList childBefore = inheritedBeforeEach;
-    for (const auto &h : s.BeforeEach)
-      childBefore.push_back(h);
+    // Recurse into children with extended hook chains if suite is not skipped.
+    HookList childBefore;
     HookList childAfter;
-    for (const auto &h : s.AfterEach)
-      childAfter.push_back(h);
-    for (const auto &h : inheritedAfterEach)
-      childAfter.push_back(h);
+
+    if (!s.Skipped) {
+      childBefore = inheritedBeforeEach;
+      for (const auto &h : s.BeforeEach)
+        childBefore.push_back(h);
+
+      for (const auto &h : s.AfterEach)
+        childAfter.push_back(h);
+      for (const auto &h : inheritedAfterEach)
+        childAfter.push_back(h);
+    }
 
     for (const auto &c : s.Children) {
       runSuite(c, d, childBefore, childAfter);
     }
 
-    for (const auto &h : s.AfterAll) {
-      try {
-        h();
-      } catch (const std::exception &e) {
-        indent(d);
-        std::cout << detail::red() << "afterAll threw: " << e.what()
-                  << detail::reset() << "\n";
+    if (!s.Skipped) {
+      for (const auto &h : s.AfterAll) {
+        try {
+          h();
+        } catch (const std::exception &e) {
+          indent(d);
+          std::cout << detail::red() << "afterAll threw: " << e.what()
+                    << detail::reset() << "\n";
+        }
       }
     }
   }
 };
 
-inline void describe(const std::string &name, const Void &body) {
-  Runner::instance().beginDescribe(name);
-  body();
-  Runner::instance().endDescribe();
-}
+namespace methods {
 
-inline void it(const std::string &name, Void body) {
-  Runner::instance().addTest(name, std::move(body));
-}
+class Block {
+public:
+  virtual ~Block() = default;
+
+  virtual void operator()(const std::string &name, const Void &body) = 0;
+
+  virtual void skip(const std::string &name, const Void &body) = 0;
+};
+
+class It : public cest::methods::Block {
+public:
+  virtual ~It() override = default;
+
+  virtual void operator()(const std::string &name, const Void &body) override {
+    Runner::instance().addTest(name, body);
+  }
+
+  virtual void skip(const std::string &name, const Void &body) override {
+    Runner::instance().skipTest(name, body);
+  }
+};
+
+class Describe : public cest::methods::Block {
+public:
+  virtual ~Describe() override = default;
+
+  virtual void operator()(const std::string &name, const Void &body) override {
+    Runner::instance().beginDescribe(name);
+    body();
+    Runner::instance().endDescribe();
+  }
+
+  virtual void skip(const std::string &name, const Void &body) override {
+    Runner::instance().beginDescribe(name);
+    Runner::instance().skipSuite();
+    body();
+    Runner::instance().endDescribe();
+  }
+};
+
+} // namespace methods
+
+inline cest::methods::Describe describe;
+inline cest::methods::It it;
 
 inline void beforeAll(Void function) {
   Runner::instance().addBeforeAll(std::move(function));

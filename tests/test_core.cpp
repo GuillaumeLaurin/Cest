@@ -262,3 +262,88 @@ TEST_SUITE("AssertionError: formatted message") {
     });
   });
 }
+
+TEST_SUITE("it.skip — individual test skipping") {
+  cest::describe("skip marks a test as skipped without running its body", []() {
+    static bool body_ran = false;
+
+    cest::it.skip("skipped test — body must not execute", []() {
+      body_ran = true; // must never be reached
+    });
+
+    cest::it("body_ran is still false after the skipped test",
+             []() { cest::expect(body_ran).toBeFalsy(); });
+  });
+
+  cest::describe("non-skipped siblings still run", []() {
+    static int ran = 0;
+
+    cest::it("runs (1)", []() { ++ran; });
+    cest::it.skip("skipped — does not increment ran", []() { ++ran; });
+    cest::it("runs (2)", []() { ++ran; });
+
+    cest::it("ran equals 2 — only non-skipped tests executed",
+             []() { cest::expect(ran).toBe(2); });
+  });
+
+  cest::describe("beforeEach is NOT called for skipped tests", []() {
+    static int hook_calls = 0;
+    static int test_calls = 0;
+
+    cest::beforeEach([]() { ++hook_calls; });
+
+    cest::it("normal test (hook fires)", []() { ++test_calls; });
+    cest::it.skip("skipped (hook must not fire)", []() { ++test_calls; });
+    cest::it("normal test again (hook fires)", []() { ++test_calls; });
+
+    cest::it("hook fired exactly twice — once per non-skipped test", []() {
+      // The beforeEach for this verification test also fires, so hook_calls
+      // will be 3 here (once per non-skipped test including this one).
+      // What matters: it did NOT fire for the skipped test.
+      cest::expect(hook_calls).toBe(3);
+      cest::expect(test_calls).toBe(2);
+    });
+  });
+}
+
+TEST_SUITE("describe.skip — entire suite skipping") {
+  cest::describe("describe.skip marks all tests in the suite as skipped", []() {
+    static bool inner_ran = false;
+
+    cest::describe.skip("skipped suite", []() {
+      cest::it("must not run", []() { inner_ran = true; });
+      cest::it("also must not run", []() { inner_ran = true; });
+    });
+
+    cest::it("inner_ran is false — skipped suite body never executed",
+             []() { cest::expect(inner_ran).toBeFalsy(); });
+  });
+
+  cest::describe("describe.skip propagates to nested describes", []() {
+    static bool deep_ran = false;
+
+    cest::describe.skip("outer skipped", []() {
+      cest::describe("nested inside skipped outer", []() {
+        cest::it("must not run", []() { deep_ran = true; });
+      });
+    });
+
+    cest::it("deep_ran is false — nesting inside skipped describe is skipped",
+             []() { cest::expect(deep_ran).toBeFalsy(); });
+  });
+
+  cest::describe("sibling describes of a skipped suite run normally", []() {
+    static int sibling_ran = 0;
+
+    cest::describe.skip("skipped sibling", []() {
+      cest::it("must not run", []() { ++sibling_ran; });
+    });
+
+    cest::describe("active sibling", []() {
+      cest::it("runs normally", []() { ++sibling_ran; });
+
+      cest::it("sibling_ran is 1 — only the active sibling ran",
+               []() { cest::expect(sibling_ran).toBe(1); });
+    });
+  });
+}
