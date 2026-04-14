@@ -65,20 +65,13 @@ jobs:
         run: >
           cmake -B build
           -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
-          -DCEST_BUILD_EXAMPLES=ON
+          -DBUILD_TESTS=ON
 
       - name: Build
         run: cmake --build build --config ${{ matrix.build_type }} --parallel
 
-      - name: Run self-test (POSIX)
-        if: runner.os != 'Windows'
-        run: ./build/cest_example
-        env:
-          NO_COLOR: "1"
-
-      - name: Run self-test (Windows)
-        if: runner.os == 'Windows'
-        run: .\build\${{ matrix.build_type }}\cest_example.exe
+      - name: Test
+        run: ctest --test-dir build --build-config ${{ matrix.build_type }} --output-on-failure
         env:
           NO_COLOR: "1"
 
@@ -95,14 +88,14 @@ jobs:
         run: >
           cmake -B build
           -DCMAKE_BUILD_TYPE=Debug
-          -DCEST_BUILD_EXAMPLES=ON
+          -DBUILD_TESTS=ON
           -DCMAKE_CXX_FLAGS="-Wall -Wextra -Wpedantic -Werror -Wshadow -Wnon-virtual-dtor"
 
       - name: Build
         run: cmake --build build --parallel
 
-      - name: Run
-        run: ./build/cest_example
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
         env:
           NO_COLOR: "1"
 
@@ -126,15 +119,15 @@ jobs:
         run: >
           cmake -B build
           -DCMAKE_BUILD_TYPE=Debug
-          -DCEST_BUILD_EXAMPLES=ON
+          -DBUILD_TESTS=ON
           -DCMAKE_CXX_FLAGS="-fsanitize=${{ matrix.sanitizer }} -fno-omit-frame-pointer -g"
           -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=${{ matrix.sanitizer }}"
 
       - name: Build
         run: cmake --build build --parallel
 
-      - name: Run
-        run: ./build/cest_example
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
         env:
           NO_COLOR: "1"
           ASAN_OPTIONS: "detect_leaks=1:halt_on_error=1:abort_on_error=1"
