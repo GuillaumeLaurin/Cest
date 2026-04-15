@@ -207,7 +207,7 @@ struct TestCase {
   std::string Name;
   Void Function;
   bool Skipped = false;
-  bool Only = false;
+  bool Focussed = false;
 };
 
 struct Suite {
@@ -219,7 +219,8 @@ struct Suite {
   std::vector<Void> BeforeEach;
   std::vector<Void> AfterEach;
   bool Skipped = false;
-  bool Only = false;
+  bool Focussed = false;
+  bool HasFocussedDescendant = false;
 };
 
 class Runner {
@@ -233,13 +234,12 @@ public:
     Suite s;
     s.Name = name;
     s.Skipped = currentSuite().Skipped;
-    s.Only = currentSuite().Only;
     Stack.push_back(std::move(s));
   }
 
   void skipSuite() { currentSuite().Skipped = true; }
 
-  void makeSuiteOnly() { currentSuite().Only = true; }
+  void focusSuite() { currentSuite().Focussed = true; }
 
   void endDescribe() {
     Suite s = std::move(Stack.back());
@@ -248,17 +248,15 @@ public:
   }
 
   void addTest(const std::string &name, Void function) {
-    bool isOnly = currentSuite().Only;
     bool isSkipped = currentSuite().Skipped;
-    currentSuite().Tests.push_back({name, function, isSkipped, isOnly});
+    currentSuite().Tests.push_back({name, function, isSkipped});
   }
 
   void skipTest(const std::string &name, Void function) {
-    bool isOnly = currentSuite().Only;
-    currentSuite().Tests.push_back({name, function, true, isOnly});
+    currentSuite().Tests.push_back({name, function, true});
   }
 
-  void makeTestOnly(const std::string &name, Void function) {
+  void focusTest(const std::string &name, Void function) {
     bool isSkipped = currentSuite().Skipped;
     currentSuite().Tests.push_back({name, function, isSkipped, true});
   }
@@ -281,6 +279,7 @@ public:
 
   int run() {
     Passed = Failed = Skipped = 0;
+    HasFocus = false;
     runSuite(Root, 0, {}, {});
     std::cout << "\n"
               << detail::bold() << "Results: " << detail::green() << Passed
@@ -296,6 +295,7 @@ private:
   Suite Root;
   std::vector<Suite> Stack;
   int Passed = 0, Failed = 0, Skipped = 0;
+  bool HasFocus = false;
 
   Runner() {
 #ifdef _WIN32
@@ -449,6 +449,8 @@ private:
     }
   }
 
+  void dryRun(Suite& s) {}
+
   // void searchOnly(const Suite &s) {
   //   // pass on the graph
 
@@ -483,7 +485,7 @@ public:
   }
 
   virtual void only(const std::string &name, const Void &body) override {
-    Runner::instance().makeTestOnly(name, body);
+    Runner::instance().focusTest(name, body);
   }
 };
 
@@ -506,7 +508,7 @@ public:
 
   virtual void only(const std::string &name, const Void &body) override {
     Runner::instance().beginDescribe(name);
-    Runner::instance().makeSuiteOnly();
+    Runner::instance().focusSuite();
     body();
     Runner::instance().endDescribe();
   }
