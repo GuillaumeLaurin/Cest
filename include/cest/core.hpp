@@ -207,6 +207,7 @@ struct TestCase {
   std::string Name;
   Void Function;
   bool Skipped = false;
+  bool Focussed = false;
 };
 
 struct Suite {
@@ -218,6 +219,8 @@ struct Suite {
   std::vector<Void> BeforeEach;
   std::vector<Void> AfterEach;
   bool Skipped = false;
+  bool Focussed = false;
+  bool HasFocussedDescendant = false;
 };
 
 class Runner {
@@ -230,13 +233,13 @@ public:
   void beginDescribe(const std::string &name) {
     Suite s;
     s.Name = name;
-    if (currentSuite().Skipped) {
-      s.Skipped = true;
-    }
+    s.Skipped = currentSuite().Skipped;
     Stack.push_back(std::move(s));
   }
 
   void skipSuite() { currentSuite().Skipped = true; }
+
+  void focusSuite() { currentSuite().Focussed = true; }
 
   void endDescribe() {
     Suite s = std::move(Stack.back());
@@ -245,15 +248,17 @@ public:
   }
 
   void addTest(const std::string &name, Void function) {
-    if (!currentSuite().Skipped) {
-      currentSuite().Tests.push_back({name, function});
-    } else {
-      skipTest(name, std::move(function));
-    }
+    bool isSkipped = currentSuite().Skipped;
+    currentSuite().Tests.push_back({name, function, isSkipped});
   }
 
   void skipTest(const std::string &name, Void function) {
     currentSuite().Tests.push_back({name, function, true});
+  }
+
+  void focusTest(const std::string &name, Void function) {
+    bool isSkipped = currentSuite().Skipped;
+    currentSuite().Tests.push_back({name, function, isSkipped, true});
   }
 
   void addBeforeAll(Void function) {
@@ -274,6 +279,15 @@ public:
 
   int run() {
     Passed = Failed = Skipped = 0;
+    HasFocus = false;
+    dryRun(Root);
+    if (HasFocus) {
+      std::cout << "\n"
+                << detail::bold() << detail::yellow() << "Focus mode activated"
+                << detail::reset() << "\n"
+                << detail::yellow() << "Don't forget to turn it off"
+                << detail::reset() << "\n";
+    }
     runSuite(Root, 0, {}, {});
     std::cout << "\n"
               << detail::bold() << "Results: " << detail::green() << Passed
@@ -289,6 +303,7 @@ private:
   Suite Root;
   std::vector<Suite> Stack;
   int Passed = 0, Failed = 0, Skipped = 0;
+  bool HasFocus = false;
 
   Runner() {
 #ifdef _WIN32
@@ -308,6 +323,9 @@ private:
 
   void runSuite(const Suite &s, int depth, HookList inheritedBeforeEach,
                 HookList inheritedAfterEach) {
+    if (HasFocus && !s.Focussed && !s.HasFocussedDescendant) {
+      return;
+    }
     if (!s.Name.empty()) {
       indent(depth);
       if (s.Skipped) {
@@ -347,6 +365,10 @@ private:
     }
 
     for (const auto &t : s.Tests) {
+      if (HasFocus && !s.Skipped && !s.Focussed) {
+        continue;
+      }
+
       indent(d);
       bool ok = true;
       std::string errMsg;
@@ -441,6 +463,27 @@ private:
       }
     }
   }
+
+  void dryRun(Suite &s) {
+    if (s.Focussed) {
+      HasFocus = true;
+    }
+
+    for (auto child : s.Children) {
+      dryRun(child);
+
+      if (child.Focussed || child.HasFocussedDescendant) {
+        s.HasFocussedDescendant = true;
+      }
+    }
+
+    for (auto test : s.Tests) {
+      if (test.Focussed) {
+        HasFocus = true;
+        s.HasFocussedDescendant = true;
+      }
+    }
+  }
 };
 
 namespace methods {
@@ -452,6 +495,8 @@ public:
   virtual void operator()(const std::string &name, const Void &body) = 0;
 
   virtual void skip(const std::string &name, const Void &body) = 0;
+
+  virtual void only(const std::string &name, const Void &body) = 0;
 };
 
 class It : public cest::methods::Block {
@@ -464,6 +509,10 @@ public:
 
   virtual void skip(const std::string &name, const Void &body) override {
     Runner::instance().skipTest(name, body);
+  }
+
+  virtual void only(const std::string &name, const Void &body) override {
+    Runner::instance().focusTest(name, body);
   }
 };
 
@@ -480,6 +529,13 @@ public:
   virtual void skip(const std::string &name, const Void &body) override {
     Runner::instance().beginDescribe(name);
     Runner::instance().skipSuite();
+    body();
+    Runner::instance().endDescribe();
+  }
+
+  virtual void only(const std::string &name, const Void &body) override {
+    Runner::instance().beginDescribe(name);
+    Runner::instance().focusSuite();
     body();
     Runner::instance().endDescribe();
   }
