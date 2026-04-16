@@ -68,6 +68,72 @@ Rules:
 - All **nested** `describe` blocks inside the skipped suite are also skipped, recursively.
 - Sibling `describe` blocks at the same level are **not** affected.
 
+## Focusing tests and suites
+
+Both `it` and `describe` support a `.only()` call that activates **focus mode**. When focus mode is active, only focused items run — everything else is silently skipped. A yellow banner is printed at the start of the run to remind you that focus mode is on.
+
+> **Warning:** focus mode is a development tool. Never commit `.only()` calls — they will silently suppress most of your test suite in CI.
+
+### `it.only` — focus a single test
+
+```cpp
+describe("my suite", [] {
+    it("this is skipped in focus mode", [] { /* ... */ });
+
+    it.only("only this test runs", [] {
+        expect(6 * 7).toBe(42);
+    });
+
+    it("this is also skipped in focus mode", [] { /* ... */ });
+});
+```
+
+### `describe.only` — focus an entire suite
+
+```cpp
+describe.only("only this suite runs", [] {
+    it("runs", [] { expect(1).toBe(1); });
+    it("also runs", [] { expect(2).toBe(2); });
+});
+
+describe("this whole suite is skipped in focus mode", [] {
+    it("will not run", [] { /* ... */ });
+});
+```
+
+### Mixing `it.only` and `describe.only`
+
+Focus mode is global: as soon as any `.only()` appears anywhere in the binary, every non-focused item is suppressed. You can mix `it.only` and `describe.only` freely — all focused items run, everything else does not.
+
+```cpp
+describe("suite A", [] {
+    it.only("focused test in A — runs", [] { expect(true).toBeTruthy(); });
+    it("non-focused test in A — skipped", [] { /* ... */ });
+});
+
+describe.only("suite B — all tests run", [] {
+    it("runs", [] { expect(42).toBe(42); });
+});
+```
+
+### Rules that `cest` enforces for focus mode, matching Jest
+
+- A focused test inside a non-focused suite still runs — focus propagates upward.
+- A non-focused test inside a focused suite runs — the suite focus covers all its children.
+- `beforeEach` / `afterEach` / `beforeAll` / `afterAll` hooks fire normally for tests that run under focus mode.
+- Tests and suites marked with `.skip()` inside a focused suite remain skipped.
+- The runner exits with code `0` if all focused tests pass, `1` if any fail — same as normal mode.
+
+### Testing focused behaviour in isolation
+
+Because `.only()` is global, tests for focus mode must live in a **separate binary** compiled from their own `TEST_SUITE` file. This prevents focus mode from suppressing the rest of your test suite:
+
+```cmake
+add_executable(test_focus test_focus.cpp)
+target_include_directories(test_focus PRIVATE include)
+add_test(NAME focus_mode COMMAND test_focus)
+```
+
 ## Lifecycle hooks
 
 All four Jest hooks are supported with the usual semantics:
