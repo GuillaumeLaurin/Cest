@@ -280,6 +280,14 @@ public:
   int run() {
     Passed = Failed = Skipped = 0;
     HasFocus = false;
+    dryRun(Root);
+    if (HasFocus) {
+      std::cout << "\n"
+                << detail::bold() << detail::yellow() << "Focus mode activated"
+                << detail::reset() << "\n"
+                << detail::yellow() << "Don't forget to turn it off"
+                << detail::reset();
+    }
     runSuite(Root, 0, {}, {});
     std::cout << "\n"
               << detail::bold() << "Results: " << detail::green() << Passed
@@ -315,6 +323,9 @@ private:
 
   void runSuite(const Suite &s, int depth, HookList inheritedBeforeEach,
                 HookList inheritedAfterEach) {
+    if (HasFocus && !s.Focussed && !s.HasFocussedDescendant) {
+      return;
+    }
     if (!s.Name.empty()) {
       indent(depth);
       if (s.Skipped) {
@@ -354,6 +365,10 @@ private:
     }
 
     for (const auto &t : s.Tests) {
+      if (HasFocus && !s.Skipped) {
+        continue;
+      }
+
       indent(d);
       bool ok = true;
       std::string errMsg;
@@ -449,14 +464,26 @@ private:
     }
   }
 
-  void dryRun(Suite& s) {}
+  void dryRun(Suite &s) {
+    if (s.Focussed) {
+      HasFocus = true;
+    }
 
-  // void searchOnly(const Suite &s) {
-  //   // pass on the graph
+    for (auto child : s.Children) {
+      dryRun(child);
 
-  //   // 1. if there is .Only (TC or S)
-  //   // 1.1 append Suite or test to the new graph
-  // }
+      if (child.Focussed || child.HasFocussedDescendant) {
+        s.HasFocussedDescendant = true;
+      }
+    }
+
+    for (auto test : s.Tests) {
+      if (test.Focussed) {
+        HasFocus = true;
+        s.HasFocussedDescendant = true;
+      }
+    }
+  }
 };
 
 namespace methods {
