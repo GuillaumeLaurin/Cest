@@ -365,7 +365,7 @@ private:
     }
 
     for (const auto &t : s.Tests) {
-      if (HasFocus && !s.Skipped) {
+      if (HasFocus && !s.Skipped && !s.Focussed) {
         continue;
       }
 
