@@ -1,4 +1,3 @@
-// Self-test and usage examples.
 #include "cest.hpp"
 
 #include <memory>
