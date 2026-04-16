@@ -286,7 +286,7 @@ public:
                 << detail::bold() << detail::yellow() << "Focus mode activated"
                 << detail::reset() << "\n"
                 << detail::yellow() << "Don't forget to turn it off"
-                << detail::reset();
+                << detail::reset() << "\n";
     }
     runSuite(Root, 0, {}, {});
     std::cout << "\n"
