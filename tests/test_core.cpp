@@ -1,5 +1,7 @@
 #include "cest/core.hpp"
 
+#include <cfloat>
+
 #define EXPECT_THROWS(expr) cest::expect(cest::Void([&]() { expr; })).toThrow()
 
 TEST_SUITE("expect: toBe / toEqual") {
