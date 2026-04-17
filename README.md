@@ -23,7 +23,68 @@ Compile with `-std=c++17 -I include`, run the binary, and you get Jest-style col
 
 ## Matchers
 
-`toBe`, `toEqual`, `toBeTruthy`, `toBeFalsy`, `toBeGreaterThan`, `toBeLessThan`, `toContain`, `toThrow`, and `.Not()` for negation (C++ does not let you use `not` as an identifier in every context, hence the capitalized `Not()`).
+### Equality
+
+`toBe(expected)` — passes if `value == expected` (using `operator==`).
+
+`toEqual(expected)` — alias for `toBe`; use when the intent is deep-value equality rather than identity.
+
+### Truthiness
+
+`toBeTruthy()` — passes if `static_cast<bool>(value)` is `true`.
+
+`toBeFalsy()` — passes if `static_cast<bool>(value)` is `false`.
+
+### Ordering
+
+`toBeGreaterThan(expected)` — passes if `value > expected`.
+
+`toBeGreaterThanOrEqual(expected)` — passes if `value >= expected`.
+
+`toBeLessThan(expected)` — passes if `value < expected`.
+
+`toBeLessThanOrEqual(expected)` — passes if `value <= expected`.
+
+### Floating-point
+
+`toBeCloseTo(expected, precision = 2)` — passes if `|value - expected| < 10^(-precision) / 2`. The default precision of `2` matches two decimal places (tolerance of `0.005`). Overloads are provided for both `float` and `double`.
+
+```cpp
+expect(0.1 + 0.2).toBeCloseTo(0.3);          // precision 2 (default)
+expect(1.0 / 3.0).toBeCloseTo(0.333, 3);     // precision 3
+```
+
+`toBeNaN()` — passes if the value satisfies `std::isnan`.
+
+`toBeFinite()` — passes if the value satisfies `std::isfinite`.
+
+`toBeInfinite()` — passes if the value satisfies `std::isinf`.
+
+```cpp
+expect(std::numeric_limits<double>::quiet_NaN()).toBeNaN();
+expect(42.0).toBeFinite();
+expect(std::numeric_limits<double>::infinity()).toBeInfinite();
+```
+
+### Containers
+
+`toContain(needle)` — passes if any element of the iterable `value` compares equal to `needle`.
+
+### Exceptions
+
+`toThrow()` — passes if the callable throws any exception.
+
+`toThrowType<E>()` — passes if the callable throws an exception of type `E` (caught by `catch (const E &)`).
+
+### Negation
+
+`.Not()` — inverts the sense of any matcher. C++ does not allow `not` as an unqualified identifier in every context, hence the capitalised form.
+
+```cpp
+expect(1).Not().toBe(2);
+expect(0.0).Not().toBeNaN();
+expect(value).Not().toBeInfinite();
+```
 
 ## Skipping tests and suites
 

@@ -1,5 +1,7 @@
 #include "cest/core.hpp"
 
+#include <cfloat>
+
 #define EXPECT_THROWS(expr) cest::expect(cest::Void([&]() { expr; })).toThrow()
 
 TEST_SUITE("expect: toBe / toEqual") {
@@ -62,6 +64,123 @@ TEST_SUITE("expect: toBeGreaterThan / toBeLessThan") {
              []() { EXPECT_THROWS(cest::expect(9).toBeLessThan(3)); });
     cest::it(".Not() passes when value is greater",
              []() { cest::expect(9).Not().toBeLessThan(3); });
+  });
+}
+
+TEST_SUITE("expect: toBeGreaterThanOrEqual / toBeLessThanOrEqual") {
+  cest::describe("toBeGreaterThanOrEqual", []() {
+    cest::it("passes when value is greater",
+             []() { cest::expect(10).toBeGreaterThanOrEqual(5); });
+    cest::it("passes when value is equal",
+             []() { cest::expect(10).toBeGreaterThanOrEqual(10); });
+    cest::it("fails when value is smaller", []() {
+      EXPECT_THROWS(cest::expect(3).toBeGreaterThanOrEqual(5));
+    });
+    cest::it(".Not() passes when value is smaller",
+             []() { cest::expect(3).Not().toBeGreaterThanOrEqual(5); });
+  });
+  cest::describe("toBeLessThanOrEqual", []() {
+    cest::it("passes when value is smaller",
+             []() { cest::expect(5).toBeLessThanOrEqual(5); });
+    cest::it("passes when value is equal",
+             []() { cest::expect(10).toBeLessThanOrEqual(10); });
+    cest::it("fails when value is greater",
+             []() { EXPECT_THROWS(cest::expect(5).toBeLessThanOrEqual(3)); });
+    cest::it(".Not() passes when value is smaller",
+             []() { cest::expect(5).Not().toBeLessThanOrEqual(3); });
+  });
+}
+
+TEST_SUITE("expect: toBeNaN / toBeFinite / toBeInfinite") {
+  // https://en.cppreference.com/w/cpp/numeric/math/isnan.html
+  cest::describe("toBeNaN", []() {
+    cest::it("passes when the value is NaN", []() {
+      cest::expect(NAN).toBeNaN();
+      cest::expect(INFINITY - INFINITY).toBeNaN();
+    });
+    cest::it("fails when the value is not NaN", []() {
+      EXPECT_THROWS(cest::expect(INFINITY).toBeNaN());
+      EXPECT_THROWS(cest::expect(0.0).toBeNaN());
+      EXPECT_THROWS(cest::expect(DBL_MIN / 2.0).toBeNaN());
+    });
+    cest::it(".Not() passes when the value is not NaN", []() {
+      cest::expect(INFINITY).Not().toBeNaN();
+      cest::expect(0.0).Not().toBeNaN();
+      cest::expect(DBL_MIN / 2.0).Not().toBeNaN();
+    });
+  });
+
+  // https://en.cppreference.com/w/cpp/numeric/math/isfinite
+  cest::describe("toBeFinite", []() {
+    cest::it("passes when the value is finite", []() {
+      cest::expect(0.0).toBeFinite();
+      cest::expect(DBL_MIN / 2.0).toBeFinite();
+    });
+    cest::it("fails when the value is not finite", []() {
+      EXPECT_THROWS(cest::expect(NAN).toBeFinite());
+      EXPECT_THROWS(cest::expect(INFINITY).toBeFinite());
+      EXPECT_THROWS(cest::expect(HUGE_VAL).toBeFinite());
+      EXPECT_THROWS(cest::expect(exp(800)).toBeFinite());
+    });
+    cest::it(".Not() passes when the value is not finite", []() {
+      cest::expect(NAN).Not().toBeFinite();
+      cest::expect(INFINITY).Not().toBeFinite();
+      cest::expect(-INFINITY).Not().toBeFinite();
+      cest::expect(HUGE_VAL).Not().toBeFinite();
+      cest::expect(std::exp(800)).Not().toBeFinite();
+    });
+  });
+
+  // https://en.cppreference.com/w/cpp/numeric/math/isinf.html
+  cest::describe("toBeInfinite", []() {
+    cest::it("passes when the value is infinite", []() {
+      cest::expect(INFINITY).toBeInfinite();
+      cest::expect(std::numeric_limits<double>::infinity()).toBeInfinite();
+      cest::expect(std::exp(800)).toBeInfinite();
+    });
+    cest::it("fails when the value is not infinite", []() {
+      EXPECT_THROWS(cest::expect(NAN).toBeInfinite());
+      EXPECT_THROWS(
+          cest::expect(std::numeric_limits<double>::max()).toBeInfinite());
+      EXPECT_THROWS(cest::expect(0.0).toBeInfinite());
+      EXPECT_THROWS(cest::expect(DBL_MIN / 2.0).toBeInfinite());
+    });
+    cest::it(".Not() passes when the value is not infinite", []() {
+      cest::expect(NAN).Not().toBeInfinite();
+      cest::expect(std::numeric_limits<double>::max()).Not().toBeInfinite();
+      cest::expect(0.0).Not().toBeInfinite();
+      cest::expect(DBL_MIN / 2.0).Not().toBeInfinite();
+    });
+  });
+}
+
+TEST_SUITE("expect: toBeCloseTo") {
+  cest::describe("toBeCloseTo (float)", []() {
+    cest::it("passes when the value is close to with a precision of 2",
+             []() { cest::expect(16.1000202f).toBeCloseTo(16.101000f); });
+    cest::it("passes when the value is close to with a precision of 4",
+             []() { cest::expect(16.1000202f).toBeCloseTo(16.100021f, 4); });
+    cest::it("passes when the value is close to with a precision of 7",
+             []() { cest::expect(16.1000202f).toBeCloseTo(16.10002021f, 6); });
+    cest::it("fails when the value is not close enough", []() {
+      EXPECT_THROWS(cest::expect(16.1000202f).toBeCloseTo(16.1005f, 6));
+    });
+    cest::it(".Not() passes when the value is not close enough", []() {
+      cest::expect(16.1000202f).Not().toBeCloseTo(16.1005f, 6);
+    });
+  });
+  cest::describe("toBeCloseTo (double)", []() {
+    cest::it("passes when the value is close to with a precision of 2",
+             []() { cest::expect(16.1000202).toBeCloseTo(16.101000); });
+    cest::it("passes when the value is close to with a precision of 4",
+             []() { cest::expect(16.1000202).toBeCloseTo(16.100021, 4); });
+    cest::it("passes when the value is close to with a precision of 7",
+             []() { cest::expect(16.1000202).toBeCloseTo(16.10002021, 6); });
+    cest::it("fails when the value is not close enough", []() {
+      EXPECT_THROWS(cest::expect(16.1000202).toBeCloseTo(16.1005, 6));
+    });
+    cest::it(".Not() passes when the value is not close enough",
+             []() { cest::expect(16.1000202).Not().toBeCloseTo(16.1005, 6); });
   });
 }
 

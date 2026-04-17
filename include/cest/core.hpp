@@ -7,7 +7,9 @@
  * This is the core of the Cest testing library.
  */
 
+#include <cmath>
 #include <cstddef>
+#include <cstdint>
 #include <cstdlib>
 #include <exception>
 #include <functional>
@@ -121,10 +123,58 @@ public:
   }
 
   template <typename Expected>
+  void toBeGreaterThanOrEqual(const Expected &expected) const {
+    bool r = (Value >= expected);
+    if (r == Negated)
+      fail("toBeGreaterThanOrEqual", detail::toStringSafe(expected));
+  }
+
+  template <typename Expected>
   void toBeLessThan(const Expected &expected) const {
     bool r = (Value < expected);
     if (r == Negated)
       fail("toBeLessThan", detail::toStringSafe(expected));
+  }
+
+  template <typename Expected>
+  void toBeLessThanOrEqual(const Expected &expected) const {
+    bool r = (Value <= expected);
+    if (r == Negated)
+      fail("toBeLessThanOrEqual", detail::toStringSafe(expected));
+  }
+
+  void toBeCloseTo(const float &expected, const uint8_t &precision = 2) {
+    float tolerance = std::pow(10.f, static_cast<float>(-precision)) / 2.0f;
+    bool r = std::abs(Value - expected) < tolerance;
+    if (r == Negated)
+      fail("toBeCloseTo", detail::toStringSafe(expected) + " ±" +
+                              detail::toStringSafe(tolerance));
+  }
+
+  void toBeCloseTo(const double &expected, const uint8_t &precision = 2) {
+    double tolerance = std::pow(10.0, -static_cast<int>(precision)) / 2.0;
+    bool r = std::abs(Value - expected) < tolerance;
+    if (r == Negated)
+      fail("toBeCloseTo", detail::toStringSafe(expected) + " ±" +
+                              detail::toStringSafe(tolerance));
+  }
+
+  void toBeNaN() {
+    bool r = std::isnan(Value);
+    if (r == Negated)
+      fail("toBeNaN", "NaN");
+  }
+
+  void toBeFinite() {
+    bool r = std::isfinite(Value);
+    if (r == Negated)
+      fail("toBeFinite", "finite");
+  }
+
+  void toBeInfinite() {
+    bool r = std::isinf(Value);
+    if (r == Negated)
+      fail("toBeInfinite", "infinite");
   }
 
   template <typename Needle> void toContain(const Needle &needle) const {
