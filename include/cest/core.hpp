@@ -18,7 +18,6 @@
 #include <type_traits>
 #include <vector>
 
-
 #if defined(_WIN32) || defined(_WIN64)
 #include <windows.h>
 #endif // defined(_WIN32) || defined(_WIN64)
@@ -144,7 +143,7 @@ public:
   }
 
   void toBeCloseTo(const float &expected, const uint8_t &precision = 2) {
-    float tolerance = std::pow(10.f, -precision) / 2.f;
+    float tolerance = std::powf(10.f, static_cast<float>(-precision)) / 2.f;
     bool r = std::abs(Value - expected) < tolerance;
     if (r == Negated)
       fail("toBeCloseTo", detail::toStringSafe(expected) + " ±" +
@@ -155,9 +154,8 @@ public:
     double tolerance = std::pow(10.f, -precision) / 2.f;
     bool r = std::abs(Value - expected) < tolerance;
     if (r == Negated)
-      fail("toBeCloseTo", "toBeCloseTo",
-           detail::toStringSafe(expected) + " ±" +
-               detail::toStringSafe(tolerance));
+      fail("toBeCloseTo", detail::toStringSafe(expected) + " ±" +
+                              detail::toStringSafe(tolerance));
   }
 
   void toBeNaN() {
