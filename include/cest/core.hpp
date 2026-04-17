@@ -152,7 +152,7 @@ public:
   }
 
   void toBeCloseTo(const double &expected, const uint8_t &precision = 2) {
-    double tolerance = std::pow(10.f, -precision) / 2.0f;
+    double tolerance = std::pow(10.0, -static_cast<int>(precision)) / 2.0;
     bool r = std::abs(Value - expected) < tolerance;
     if (r == Negated)
       fail("toBeCloseTo", detail::toStringSafe(expected) + " ±" +
