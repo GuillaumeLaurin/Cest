@@ -107,6 +107,21 @@ struct is_container<T, std::void_t<typename T::value_type, typename T::iterator,
 
 template <typename T>
 inline constexpr bool is_container_v = is_container<T>::value;
+
+template <typename T, typename U>
+inline bool deepEqual(const T &a, const U &b) {
+  if constexpr (detail::is_container_v<T> && detail::is_container_v<U>) {
+    if (a.size() != b.size())
+      return false;
+    auto itA = a.begin(), itB = b.begin();
+    for (; itA != a.end(); ++itA, ++itB)
+      if (!deepEqual(*itA, *itB))
+        return false;
+    return true;
+  } else {
+    return a == b;
+  }
+}
 } // namespace detail
 
 template <typename Actual> class Expectation {
@@ -320,6 +335,23 @@ public:
     bool r = Value.size() == length;
     if (r == Negated)
       fail("toHaveLength", detail::toStringSafe(length));
+  }
+
+  template <
+      typename Expected, typename A = Actual,
+      std::enable_if_t<detail::is_container_v<A>, int> = 0,
+      std::enable_if_t<std::is_convertible_v<Expected, typename A::value_type>,
+                       int> = 0>
+  void toContainEqual(const Expected &expected) {
+    bool found = false;
+    for (const auto &elem : Value) {
+      if (detail::deepEqual(elem, expected)) {
+        found = true;
+        break;
+      }
+    }
+    if (found == Negated)
+      fail("toContainEqual", "...");
   }
 
 private:
