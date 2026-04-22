@@ -217,6 +217,18 @@ public:
       fail("toMatch", "/" + regex.Pattern + "/");
   }
 
+  void toStartWith(const std::string &prefix) {
+    bool r = std::string(Value).rfind(prefix, 0) == 0;
+    if (r == Negated)
+      fail("toStartWith", detail::toStringSafe(prefix));
+  }
+
+  void toStartWith(const char *prefix) {
+    bool r = std::string(Value).rfind(prefix, 0) == 0;
+    if (r == Negated)
+      fail("toStartWith", detail::toStringSafe(prefix));
+  }
+
   template <typename Needle> void toContain(const Needle &needle) const {
     bool found = false;
     for (const auto &actual : Value) {
