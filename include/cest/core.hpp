@@ -693,7 +693,7 @@ private:
       HasFocus = true;
     }
 
-    for (auto child : s.Children) {
+    for (auto &child : s.Children) {
       dryRun(child);
 
       if (child.Focussed || child.HasFocussedDescendant) {
