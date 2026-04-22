@@ -354,6 +354,15 @@ public:
       fail("toContainEqual", "...");
   }
 
+  template <typename A = Actual,
+            std::enable_if_t<detail::is_container_v<A>, int> = 0>
+  void toBeEmpty() {
+    bool r = Value.empty();
+
+    if (r == Negated)
+      fail("toBeEmpty", "...");
+  }
+
 private:
   Actual Value;
   bool Negated;
