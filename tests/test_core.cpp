@@ -184,6 +184,82 @@ TEST_SUITE("expect: toBeCloseTo") {
   });
 }
 
+TEST_SUITE("expect: toMatch") {
+  cest::describe("toMatch (substring)", []() {
+    cest::it("passes when substring is present", []() {
+      cest::expect(std::string("hello world")).toMatch("world");
+      cest::expect(std::string("hello world")).toMatch(std::string("hello"));
+    });
+    cest::it("fails when substring is absent", []() {
+      EXPECT_THROWS(cest::expect(std::string("hello")).toMatch("xyz"));
+    });
+    cest::it(".Not() passes when substring is absent",
+             []() { cest::expect(std::string("hello")).Not().toMatch("xyz"); });
+    cest::it(".Not() fails when substring is present", []() {
+      EXPECT_THROWS(cest::expect(std::string("hello")).Not().toMatch("hello"));
+    });
+  });
+
+  cest::describe("toMatch (regex)", []() {
+    cest::it("passes when regex matches", []() {
+      cest::expect(std::string("hello123")).toMatch(cest::Regex{"[0-9]+"});
+    });
+    cest::it("fails when regex does not match", []() {
+      EXPECT_THROWS(
+          cest::expect(std::string("hello")).toMatch(cest::Regex{"[0-9]+"}));
+    });
+    cest::it(".Not() passes when regex does not match", []() {
+      cest::expect(std::string("hello")).Not().toMatch(cest::Regex{"[0-9]+"});
+    });
+    cest::it(".Not() fails when regex matches", []() {
+      EXPECT_THROWS(cest::expect(std::string("hello123"))
+                        .Not()
+                        .toMatch(cest::Regex{"[0-9]+"}));
+    });
+  });
+}
+
+TEST_SUITE("expect: toStartWith") {
+  cest::describe("toStartWith", []() {
+    cest::it("passes when string starts with prefix", []() {
+      cest::expect(std::string("hello world")).toStartWith("hello");
+      cest::expect(std::string("hello world"))
+          .toStartWith(std::string("hello"));
+    });
+    cest::it("fails when string does not start with prefix", []() {
+      EXPECT_THROWS(
+          cest::expect(std::string("hello world")).toStartWith("world"));
+    });
+    cest::it(".Not() passes when string does not start with prefix", []() {
+      cest::expect(std::string("hello world")).Not().toStartWith("world");
+    });
+    cest::it(".Not() fails when string starts with prefix", []() {
+      EXPECT_THROWS(
+          cest::expect(std::string("hello world")).Not().toStartWith("hello"));
+    });
+  });
+}
+
+TEST_SUITE("expect: toEndWith") {
+  cest::describe("toEndWith", []() {
+    cest::it("passes when string ends with suffix", []() {
+      cest::expect(std::string("hello world")).toEndWith("world");
+      cest::expect(std::string("hello world")).toEndWith(std::string("world"));
+    });
+    cest::it("fails when string does not end with suffix", []() {
+      EXPECT_THROWS(
+          cest::expect(std::string("hello world")).toEndWith("hello"));
+    });
+    cest::it(".Not() passes when string does not end with suffix", []() {
+      cest::expect(std::string("hello world")).Not().toEndWith("hello");
+    });
+    cest::it(".Not() fails when string ends with suffix", []() {
+      EXPECT_THROWS(
+          cest::expect(std::string("hello world")).Not().toEndWith("world"));
+    });
+  });
+}
+
 TEST_SUITE("expect: toContain") {
   cest::describe("vector of integers", []() {
     const std::vector<int> v = {1, 2, 3, 4};

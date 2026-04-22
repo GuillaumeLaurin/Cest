@@ -14,6 +14,7 @@
 #include <exception>
 #include <functional>
 #include <iostream>
+#include <regex>
 #include <sstream>
 #include <string>
 #include <type_traits>
@@ -26,6 +27,13 @@
 namespace cest {
 
 using Void = std::function<void()>;
+
+struct Regex {
+  Regex(const std::string &pattern) : Pattern(pattern), Reg(pattern) {}
+
+  std::string Pattern;
+  std::regex Reg;
+};
 
 namespace detail {
 inline bool colorEnabled() {
@@ -49,6 +57,13 @@ inline const char *gray() { return colorEnabled() ? "\033[90m" : ""; }
 inline const char *yellow() { return colorEnabled() ? "\033[33m" : ""; }
 inline const char *bold() { return colorEnabled() ? "\033[1m" : ""; }
 inline const char *reset() { return colorEnabled() ? "\033[0m" : ""; }
+
+inline bool endsWith(const std::string &str, const std::string &suffix) {
+  if (str.length() < suffix.length())
+    return false;
+  return str.compare(str.length() - suffix.length(), suffix.length(), suffix) ==
+         0;
+}
 } // namespace detail
 
 /**
@@ -115,34 +130,52 @@ public:
       fail("toBeFalsy", "falsy value");
   }
 
-  template <typename Expected>
+  //
+  // Numeric Matchers
+  //
+
+  template <typename Expected,
+            std::enable_if_t<std::is_arithmetic_v<Actual> &&
+                                 std::is_arithmetic_v<Expected>,
+                             int> = 0>
   void toBeGreaterThan(const Expected &expected) const {
     bool r = (Value > expected);
     if (r == Negated)
       fail("toBeGreaterThan", detail::toStringSafe(expected));
   }
 
-  template <typename Expected>
+  template <typename Expected,
+            std::enable_if_t<std::is_arithmetic_v<Actual> &&
+                                 std::is_arithmetic_v<Expected>,
+                             int> = 0>
   void toBeGreaterThanOrEqual(const Expected &expected) const {
     bool r = (Value >= expected);
     if (r == Negated)
       fail("toBeGreaterThanOrEqual", detail::toStringSafe(expected));
   }
 
-  template <typename Expected>
+  template <typename Expected,
+            std::enable_if_t<std::is_arithmetic_v<Actual> &&
+                                 std::is_arithmetic_v<Expected>,
+                             int> = 0>
   void toBeLessThan(const Expected &expected) const {
     bool r = (Value < expected);
     if (r == Negated)
       fail("toBeLessThan", detail::toStringSafe(expected));
   }
 
-  template <typename Expected>
+  template <typename Expected,
+            std::enable_if_t<std::is_arithmetic_v<Actual> &&
+                                 std::is_arithmetic_v<Expected>,
+                             int> = 0>
   void toBeLessThanOrEqual(const Expected &expected) const {
     bool r = (Value <= expected);
     if (r == Negated)
       fail("toBeLessThanOrEqual", detail::toStringSafe(expected));
   }
 
+  template <typename A = Actual,
+            std::enable_if_t<std::is_floating_point_v<A>, int> = 0>
   void toBeCloseTo(const float &expected, const uint8_t &precision = 2) {
     float tolerance = std::pow(10.f, static_cast<float>(-precision)) / 2.0f;
     bool r = std::abs(Value - expected) < tolerance;
@@ -151,6 +184,8 @@ public:
                               detail::toStringSafe(tolerance));
   }
 
+  template <typename A = Actual,
+            std::enable_if_t<std::is_floating_point_v<A>, int> = 0>
   void toBeCloseTo(const double &expected, const uint8_t &precision = 2) {
     double tolerance = std::pow(10.0, -static_cast<int>(precision)) / 2.0;
     bool r = std::abs(Value - expected) < tolerance;
@@ -159,22 +194,94 @@ public:
                               detail::toStringSafe(tolerance));
   }
 
+  template <typename A = Actual,
+            std::enable_if_t<std::is_floating_point_v<A>, int> = 0>
   void toBeNaN() {
     bool r = std::isnan(Value);
     if (r == Negated)
       fail("toBeNaN", "NaN");
   }
 
+  template <typename A = Actual,
+            std::enable_if_t<std::is_floating_point_v<A>, int> = 0>
   void toBeFinite() {
     bool r = std::isfinite(Value);
     if (r == Negated)
       fail("toBeFinite", "finite");
   }
 
+  template <typename A = Actual,
+            std::enable_if_t<std::is_floating_point_v<A>, int> = 0>
   void toBeInfinite() {
     bool r = std::isinf(Value);
     if (r == Negated)
       fail("toBeInfinite", "infinite");
+  }
+
+  //
+  // String Matchers
+  //
+
+  template <typename A = Actual,
+            std::enable_if_t<std::is_convertible_v<A, std::string>, int> = 0>
+  void toMatch(const std::string &sub) {
+    bool r = std::string(Value).find(sub) != std::string::npos;
+    if (r == Negated)
+      fail("toMatch", "\"" + sub + "\"");
+  }
+
+  template <typename A = Actual,
+            std::enable_if_t<std::is_convertible_v<A, std::string>, int> = 0>
+  void toMatch(const char *sub) {
+    bool r = std::string(Value).find(sub) != std::string::npos;
+    if (r == Negated)
+      fail("toMatch", "\"" + std::string(sub) + "\"");
+  }
+
+  template <typename A = Actual,
+            std::enable_if_t<std::is_convertible_v<A, std::string>, int> = 0>
+  void toMatch(const Regex &regex) {
+    bool found = false;
+    std::smatch matches;
+    if (std::regex_search(Value, matches, regex.Reg)) {
+      if (matches.size()) {
+        found = true;
+      }
+    }
+    if (found == Negated)
+      fail("toMatch", "/" + regex.Pattern + "/");
+  }
+
+  template <typename A = Actual,
+            std::enable_if_t<std::is_convertible_v<A, std::string>, int> = 0>
+  void toStartWith(const std::string &prefix) {
+    bool r = std::string(Value).rfind(prefix, 0) == 0;
+    if (r == Negated)
+      fail("toStartWith", detail::toStringSafe(prefix));
+  }
+
+  template <typename A = Actual,
+            std::enable_if_t<std::is_convertible_v<A, std::string>, int> = 0>
+  void toStartWith(const char *prefix) {
+    bool r = std::string(Value).rfind(prefix, 0) == 0;
+    if (r == Negated)
+      fail("toStartWith", detail::toStringSafe(prefix));
+  }
+
+  template <typename A = Actual,
+            std::enable_if_t<std::is_convertible_v<A, std::string>, int> = 0>
+  void toEndWith(const std::string &suffix) {
+    bool r = detail::endsWith(std::string(Value), suffix);
+    if (r == Negated)
+      fail("toEndWith", detail::toStringSafe(suffix));
+  }
+
+  template <typename A = Actual,
+            std::enable_if_t<std::is_convertible_v<A, std::string>, int> = 0>
+  void toEndWith(const char *suffix) {
+    bool r = detail::endsWith(std::string(Value), suffix);
+    if (r == Negated)
+      fail("toEndWith", detail::toStringSafe(suffix));
   }
 
   template <typename Needle> void toContain(const Needle &needle) const {

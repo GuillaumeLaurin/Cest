@@ -66,6 +66,28 @@ expect(42.0).toBeFinite();
 expect(std::numeric_limits<double>::infinity()).toBeInfinite();
 ```
 
+### String
+
+These matchers are only available when `Actual` is convertible to `std::string`. They will not compile for numeric or other non-string types.
+
+`toMatch(substring)` — passes if the string contains the given substring. Accepts `std::string` or `const char *`.
+
+`toMatch(regex)` — passes if the string matches the given `cest::Regex`. The pattern is preserved for readable error messages.
+
+`toStartWith(prefix)` — passes if the string begins with the given prefix. Accepts `std::string` or `const char *`.
+
+`toEndWith(suffix)` — passes if the string ends with the given suffix. Accepts `std::string` or `const char *`.
+
+```cpp
+expect(std::string("hello world")).toMatch("world");
+expect(std::string("hello world")).toMatch(cest::Regex{"^hello"});
+expect(std::string("hello world")).toStartWith("hello");
+expect(std::string("hello world")).toEndWith("world");
+
+expect(std::string("hello")).Not().toMatch("xyz");
+expect(std::string("hello world")).Not().toStartWith("world");
+```
+
 ### Containers
 
 `toContain(needle)` — passes if any element of the iterable `value` compares equal to `needle`.
