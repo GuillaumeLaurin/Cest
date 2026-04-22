@@ -351,7 +351,7 @@ public:
       }
     }
     if (found == Negated)
-      fail("toContainEqual", "...");
+      fail("toContainEqual", detail::toStringSafe(expected));
   }
 
   template <typename A = Actual,
@@ -360,7 +360,7 @@ public:
     bool r = Value.empty();
 
     if (r == Negated)
-      fail("toBeEmpty", "...");
+      fail("toBeEmpty", "size=" + detail::toStringSafe(Value.size()));
   }
 
 private:
