@@ -95,6 +95,18 @@ template <typename T> std::string toStringSafe(const T &v) {
     return "<non-printable>";
   }
 }
+
+template <typename T, typename = void> struct is_container : std::false_type {};
+
+template <typename T>
+struct is_container<T, std::void_t<typename T::value_type, typename T::iterator,
+                                   decltype(std::declval<T>().begin()),
+                                   decltype(std::declval<T>().end()),
+                                   decltype(std::declval<T>().size())>>
+    : std::true_type {};
+
+template <typename T>
+inline constexpr bool is_container_v = is_container<T>::value;
 } // namespace detail
 
 template <typename Actual> class Expectation {
@@ -284,7 +296,13 @@ public:
       fail("toEndWith", detail::toStringSafe(suffix));
   }
 
-  template <typename Needle> void toContain(const Needle &needle) const {
+  //
+  // Container Matchers
+  //
+
+  template <typename Needle, typename A = Actual,
+            std::enable_if_t<detail::is_container_v<A>, int> = 0>
+  void toContain(const Needle &needle) const {
     bool found = false;
     for (const auto &actual : Value) {
       if (actual == needle) {
