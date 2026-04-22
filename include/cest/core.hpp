@@ -57,6 +57,13 @@ inline const char *gray() { return colorEnabled() ? "\033[90m" : ""; }
 inline const char *yellow() { return colorEnabled() ? "\033[33m" : ""; }
 inline const char *bold() { return colorEnabled() ? "\033[1m" : ""; }
 inline const char *reset() { return colorEnabled() ? "\033[0m" : ""; }
+
+inline bool endsWith(const std::string &str, const std::string &suffix) {
+  if (str.length() < suffix.length())
+    return false;
+  return str.compare(str.length() - suffix.length(), suffix.length(), suffix) ==
+         0;
+}
 } // namespace detail
 
 /**
@@ -227,6 +234,18 @@ public:
     bool r = std::string(Value).rfind(prefix, 0) == 0;
     if (r == Negated)
       fail("toStartWith", detail::toStringSafe(prefix));
+  }
+
+  void toEndWith(const std::string &suffix) {
+    bool r = detail::endsWith(std::string(Value), suffix);
+    if (r == Negated)
+      fail("toEndWith", detail::toStringSafe(suffix));
+  }
+
+  void toEndWith(const char *suffix) {
+    bool r = detail::endsWith(std::string(Value), suffix);
+    if (r == Negated)
+      fail("toEndWith", detail::toStringSafe(suffix));
   }
 
   template <typename Needle> void toContain(const Needle &needle) const {
