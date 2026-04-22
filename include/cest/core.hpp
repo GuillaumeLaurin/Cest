@@ -14,6 +14,7 @@
 #include <exception>
 #include <functional>
 #include <iostream>
+#include <regex>
 #include <sstream>
 #include <string>
 #include <type_traits>
@@ -26,6 +27,13 @@
 namespace cest {
 
 using Void = std::function<void()>;
+
+struct Regex {
+  Regex(const std::string &pattern) : Pattern(pattern), Reg(pattern) {}
+
+  std::string Pattern;
+  std::regex Reg;
+};
 
 namespace detail {
 inline bool colorEnabled() {
@@ -115,6 +123,10 @@ public:
       fail("toBeFalsy", "falsy value");
   }
 
+  //
+  // Numeric Matchers
+  //
+
   template <typename Expected>
   void toBeGreaterThan(const Expected &expected) const {
     bool r = (Value > expected);
@@ -175,6 +187,34 @@ public:
     bool r = std::isinf(Value);
     if (r == Negated)
       fail("toBeInfinite", "infinite");
+  }
+
+  //
+  // String Matchers
+  //
+
+  void toMatch(const std::string &sub) {
+    bool r = std::string(Value).find(sub) != std::string::npos;
+    if (r == Negated)
+      fail("toMatch", "\"" + sub + "\"");
+  }
+
+  void toMatch(const char *sub) {
+    bool r = std::string(Value).find(sub) != std::string::npos;
+    if (r == Negated)
+      fail("toMatch", "\"" + sub + "\"");
+  }
+
+  void toMatch(const Regex &regex) {
+    bool found = false;
+    std::smatch matches;
+    if (std::regex_search(Value, matches, regex.Reg)) {
+      if (matches.size()) {
+        found = true;
+      }
+    }
+    if (found == Negated)
+      fail("toMatch", "/" + regex.Pattern + "/");
   }
 
   template <typename Needle> void toContain(const Needle &needle) const {
