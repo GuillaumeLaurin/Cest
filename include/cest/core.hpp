@@ -314,6 +314,14 @@ public:
       fail("toContain", detail::toStringSafe(needle));
   }
 
+  template <typename A = Actual,
+            std::enable_if_t<detail::is_container_v<A>, int> = 0>
+  void toHaveLength(const std::size_t &length) {
+    bool r = Value.size() == length;
+    if (r == Negated)
+      fail("toHaveLength", detail::toStringSafe(length));
+  }
+
 private:
   Actual Value;
   bool Negated;
