@@ -29,6 +29,29 @@ Compile with `-std=c++17 -I include`, run the binary, and you get Jest-style col
 
 `toEqual(expected)` — alias for `toBe`; use when the intent is deep-value equality rather than identity.
 
+`toStrictEqual(expected)` — passes if both the **type** and the **value** are identical. Unlike `toBe` and `toEqual`, this matcher fails immediately when `Actual` and `Expected` are different types (after stripping cv-qualifiers and references), even if the values would compare equal via `operator==`. When both types match, it performs a recursive `deepEqual` — the same element-wise comparison used internally by container matchers. For containers, the error message includes the index of the first mismatching element or a size-mismatch note.
+
+```cpp
+// Type match — value compared with deepEqual
+expect(std::vector<int>{1, 2, 3}).toStrictEqual(std::vector<int>{1, 2, 3}); // passes
+expect(std::vector<int>{1, 2, 3}).toStrictEqual(std::vector<int>{1, 2, 9}); // fails: mismatch at index 2
+
+// Type mismatch — fails immediately, no value comparison
+int i = 1;
+long l = 1;
+expect(i).Not().toStrictEqual(l); // passes: int != long
+
+// Nested containers
+std::vector<std::vector<int>> a = {{1, 2}, {3, 4}};
+std::vector<std::vector<int>> b = {{1, 2}, {3, 4}};
+expect(a).toStrictEqual(b); // passes
+
+// Negation
+expect(std::vector<int>{1, 2}).Not().toStrictEqual(std::vector<int>{1, 9}); // passes
+```
+
+> **Note:** The type check uses `std::is_same` after `std::remove_cv_t<std::remove_reference_t<T>>`. Two types that are identical after stripping qualifiers (e.g. `const int` and `int`) are considered the same type.
+
 ### Truthiness
 
 `toBeTruthy()` — passes if `static_cast<bool>(value)` is `true`.

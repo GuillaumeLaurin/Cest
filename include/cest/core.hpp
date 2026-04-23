@@ -82,20 +82,6 @@ struct is_streamable<T, std::void_t<decltype(std::declval<std::ostream &>()
                                              << std::declval<const T &>())>>
     : std::true_type {};
 
-/**
- * @brief Converts safely a type T to string if the type is streamable
- * @returns a string
- */
-template <typename T> std::string toStringSafe(const T &v) {
-  if constexpr (is_streamable<T>::value) {
-    std::ostringstream os;
-    os << v;
-    return os.str();
-  } else {
-    return "<non-printable>";
-  }
-}
-
 template <typename T, typename = void> struct is_container : std::false_type {};
 
 template <typename T>
@@ -108,20 +94,38 @@ struct is_container<T, std::void_t<typename T::value_type, typename T::iterator,
 template <typename T>
 inline constexpr bool is_container_v = is_container<T>::value;
 
-template <typename T, typename U>
-inline bool deepEqual(const T &a, const U &b) {
-  if constexpr (detail::is_container_v<T> && detail::is_container_v<U>) {
-    if (a.size() != b.size())
-      return false;
-    auto itA = a.begin(), itB = b.begin();
-    for (; itA != a.end(); ++itA, ++itB)
-      if (!deepEqual(*itA, *itB))
-        return false;
-    return true;
+/**
+ * @brief Converts safely a type T to string if the type is streamable
+ * @returns a string
+ */
+template <typename T> std::string toStringSafe(const T &v) {
+  if constexpr (detail::is_container_v<T> && !std::is_same_v<T, std::string>) {
+    std::string result = "[";
+    auto iter = v.begin();
+    while (iter != v.end()) {
+      result += toStringSafe(*iter);
+      if (++iter != v.end()) {
+        result += ", ";
+      }
+    }
+    return result + "]";
+  } else if constexpr (is_streamable<T>::value) {
+    std::ostringstream os;
+    os << v;
+    return os.str();
+  } else if constexpr (std::is_same_v<T, bool>) {
+    return v ? "true" : "false";
+  } else if constexpr (std::is_same_v<T, char>) {
+    return std::string(1, v);
+  } else if constexpr (std::is_arithmetic_v<T>) {
+    return std::to_string(v);
+  } else if constexpr (std::is_convertible_v<T, std::string>) {
+    return std::string(v);
   } else {
-    return a == b;
+    return "<non-printable>";
   }
 }
+
 } // namespace detail
 
 template <typename Actual> class Expectation {
@@ -143,6 +147,28 @@ public:
     bool eq = (Value == expected);
     if (eq == Negated)
       fail("toEqual", detail::toStringSafe(expected));
+  }
+
+  template <typename Expected>
+  void toStrictEqual(const Expected &expected) const {
+    using A = std::remove_cv_t<std::remove_reference_t<Actual>>;
+    using E = std::remove_cv_t<std::remove_reference_t<Expected>>;
+
+    if constexpr (!std::is_same_v<A, E>) {
+      if (!Negated)
+        fail("toStrictEqual", detail::toStringSafe(expected));
+      return;
+    } else {
+      bool eq = deepEqual(Value, expected);
+
+      if (eq == Negated) {
+        if constexpr (detail::is_container_v<A> && detail::is_container_v<E>) {
+          fail("toStrictEqual", containerDiff(expected));
+        } else {
+          fail("toStrictEqual", detail::toStringSafe(expected));
+        }
+      }
+    }
   }
 
   void toBeTruthy() const {
@@ -345,7 +371,7 @@ public:
   void toContainEqual(const Expected &expected) {
     bool found = false;
     for (const auto &elem : Value) {
-      if (detail::deepEqual(elem, expected)) {
+      if (deepEqual(elem, expected)) {
         found = true;
         break;
       }
@@ -372,6 +398,48 @@ private:
     os << "expect(" << detail::toStringSafe(Value) << ")"
        << (Negated ? ".not." : ".") << matcher << "(" << expected_str << ")";
     throw AssertionError(os.str());
+  }
+
+  template <typename T, typename U>
+  inline bool deepEqual(const T &a, const U &b) const {
+    if constexpr (detail::is_container_v<T> && detail::is_container_v<U>) {
+      if (a.size() != b.size())
+        return false;
+      auto itA = a.begin();
+      auto itB = b.begin();
+      for (; itA != a.end(); ++itA, ++itB)
+        if (!deepEqual(*itA, *itB))
+          return false;
+      return true;
+    } else {
+      return a == b;
+    }
+  }
+
+  template <typename Expected>
+  std::string containerDiff(const Expected &expected) const {
+    std::ostringstream os;
+    os << detail::toStringSafe(expected);
+
+    auto itA = Value.begin();
+    auto itE = expected.begin();
+    std::size_t i = 0;
+
+    for (; itA != Value.end() && itE != expected.end(); ++itA, ++itE, ++i) {
+      if (!(*itA == *itE)) {
+        os << " (first mismatch at index " << i << ": got "
+           << detail::toStringSafe(*itA) << ", expected "
+           << detail::toStringSafe(*itE) << ")";
+        return os.str();
+      }
+    }
+
+    if (Value.size() != expected.size()) {
+      os << " (size mismatch: got " << Value.size() << ", expected "
+         << expected.size() << ")";
+    }
+
+    return os.str();
   }
 };
 

@@ -29,6 +29,83 @@ TEST_SUITE("expect: toBe / toEqual") {
   });
 }
 
+TEST_SUITE("expect: toStrictEqual") {
+  cest::describe("scalaires — même type", []() {
+    cest::it("passes for identical ints",
+             []() { cest::expect(42).toStrictEqual(42); });
+    cest::it("passes for identical strings", []() {
+      cest::expect(std::string("hello")).toStrictEqual(std::string("hello"));
+    });
+    cest::it("fails for different ints",
+             []() { EXPECT_THROWS(cest::expect(1).toStrictEqual(2)); });
+    cest::it(".Not() passes for different ints",
+             []() { cest::expect(1).Not().toStrictEqual(2); });
+    cest::it(".Not() fails for identical ints",
+             []() { EXPECT_THROWS(cest::expect(5).Not().toStrictEqual(5)); });
+  });
+
+  cest::describe("scalaires — types différents", []() {
+    cest::it(".Not() passes for int vs double (type mismatch)",
+             []() { cest::expect(42).Not().toStrictEqual(42.0); });
+    cest::it("fails for int vs double without .Not()",
+             []() { EXPECT_THROWS(cest::expect(42).toStrictEqual(42.0)); });
+    cest::it(".Not() passes for float vs double (type mismatch)",
+             []() { cest::expect(1.0f).Not().toStrictEqual(1.0); });
+  });
+
+  cest::describe("containers — std::vector", []() {
+    cest::it("passes for identical vectors", []() {
+      cest::expect(std::vector<int>{1, 2, 3})
+          .toStrictEqual(std::vector<int>{1, 2, 3});
+    });
+    cest::it("fails for vectors with different values", []() {
+      EXPECT_THROWS(cest::expect(std::vector<int>{1, 2, 3})
+                        .toStrictEqual(std::vector<int>{1, 9, 3}));
+    });
+    cest::it("error message shows first mismatch index", []() {
+      bool caught = false;
+      try {
+        cest::expect(std::vector<int>{1, 2, 3})
+            .toStrictEqual(std::vector<int>{1, 9, 3});
+      } catch (const cest::AssertionError &e) {
+        caught = true;
+        cest::expect(std::string(e.what())).toMatch("index 1");
+      }
+      cest::expect(caught).toBeTruthy();
+    });
+    cest::it("fails for vectors with different sizes", []() {
+      EXPECT_THROWS(cest::expect(std::vector<int>{1, 2})
+                        .toStrictEqual(std::vector<int>{1, 2, 3}));
+    });
+    cest::it(".Not() passes for vectors with different values", []() {
+      cest::expect(std::vector<int>{1, 2, 3})
+          .Not()
+          .toStrictEqual(std::vector<int>{1, 9, 3});
+    });
+    cest::it(".Not() fails for identical vectors", []() {
+      EXPECT_THROWS(cest::expect(std::vector<int>{1, 2, 3})
+                        .Not()
+                        .toStrictEqual(std::vector<int>{1, 2, 3}));
+    });
+  });
+
+  cest::describe("containers — std::array", []() {
+    cest::it("passes for identical arrays", []() {
+      cest::expect(std::array<int, 3>{1, 2, 3})
+          .toStrictEqual(std::array<int, 3>{1, 2, 3});
+    });
+    cest::it("fails for arrays with different values", []() {
+      EXPECT_THROWS(cest::expect(std::array<int, 3>{1, 2, 3})
+                        .toStrictEqual(std::array<int, 3>{1, 2, 99}));
+    });
+    cest::it(".Not() passes for arrays with different values", []() {
+      cest::expect(std::array<int, 3>{1, 2, 3})
+          .Not()
+          .toStrictEqual(std::array<int, 3>{1, 2, 99});
+    });
+  });
+}
+
 TEST_SUITE("expect: toBeTruthy / toBeFalsy") {
   cest::describe("toBeTruthy", []() {
     cest::it("passes for true", []() { cest::expect(true).toBeTruthy(); });
