@@ -340,7 +340,6 @@ TEST_SUITE("expect: container matchers — std::vector") {
   });
 }
 
-// std::array : pas de .empty() — toBeEmpty exclu
 TEST_SUITE("expect: container matchers — std::array") {
   cest::describe("toContain", []() {
     const std::array<int, 4> a = {1, 2, 3, 4};
@@ -361,9 +360,21 @@ TEST_SUITE("expect: container matchers — std::array") {
     cest::it("fails for the wrong length",
              [a]() { EXPECT_THROWS(cest::expect(a).toHaveLength(1)); });
   });
+
+  cest::describe("toBeEmpty", []() {
+    const std::array<int, 0> empty = {};
+    const std::array<int, 3> nonempty = {1, 2, 3};
+
+    cest::it("passes on empty array (size 0)",
+             [empty]() { cest::expect(empty).toBeEmpty(); });
+    cest::it("fails on non-empty array", [nonempty]() {
+      EXPECT_THROWS(cest::expect(nonempty).toBeEmpty());
+    });
+    cest::it(".Not() passes on non-empty array",
+             [nonempty]() { cest::expect(nonempty).Not().toBeEmpty(); });
+  });
 }
 
-// std::map : value_type = pair<const K, V>
 TEST_SUITE("expect: container matchers — std::map") {
   cest::describe("toContain (pair)", []() {
     const std::map<std::string, int> m = {{"a", 1}, {"b", 2}, {"c", 3}};
@@ -425,7 +436,6 @@ TEST_SUITE("expect: container matchers — std::set") {
   });
 }
 
-// std::string satisfait is_container_v (value_type = char)
 TEST_SUITE("expect: container matchers — std::string as container") {
   cest::describe("toContain (char)", []() {
     const std::string s = "hello";
