@@ -569,6 +569,60 @@ TEST_SUITE("expect(fn): toThrow / toThrowType") {
   });
 }
 
+TEST_SUITE("expect(fn): toThrowMessage") {
+  cest::describe("toThrowMessage", []() {
+    cest::it("passes when the thrown message matches (std::string)", []() {
+      cest::expect(cest::Void([]() {
+        throw std::runtime_error("exact message");
+      })).toThrowMessage(std::string("exact message"));
+    });
+
+    cest::it("passes when the thrown message matches (const char*)", []() {
+      cest::expect(cest::Void([]() {
+        throw std::runtime_error("exact message");
+      })).toThrowMessage("exact message");
+    });
+
+    cest::it("fails when the message does not match", []() {
+      EXPECT_THROWS(cest::expect(cest::Void([]() {
+                      throw std::runtime_error("actual message");
+                    })).toThrowMessage("expected message"));
+    });
+
+    cest::it("fails when nothing is thrown", []() {
+      EXPECT_THROWS(
+          cest::expect(cest::Void([]() {})).toThrowMessage("some message"));
+    });
+
+    cest::it(".Not() passes when the message does not match", []() {
+      cest::expect(cest::Void([]() { throw std::runtime_error("actual"); }))
+          .Not()
+          .toThrowMessage("different");
+    });
+
+    cest::it(".Not() fails when the message matches", []() {
+      EXPECT_THROWS(
+          cest::expect(cest::Void([]() { throw std::runtime_error("boom"); }))
+              .Not()
+              .toThrowMessage("boom"));
+    });
+
+    cest::it("error message includes both strings on mismatch", []() {
+      bool caught = false;
+      try {
+        cest::expect(cest::Void([]() {
+          throw std::runtime_error("actual");
+        })).toThrowMessage("expected");
+      } catch (const cest::AssertionError &e) {
+        caught = true;
+        cest::expect(std::string(e.what())).toMatch("expected");
+        cest::expect(std::string(e.what())).toMatch("actual");
+      }
+      cest::expect(caught).toBeTruthy();
+    });
+  });
+}
+
 TEST_SUITE("Hooks: beforeAll / afterAll") {
   cest::describe("beforeAll initializes before all tests", []() {
     static int counter = 0;

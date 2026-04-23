@@ -432,24 +432,6 @@ public:
     }
   }
 
-  void toThrowMessage(const char *expected) const {
-    bool ok = false;
-    std::string message = "";
-    try {
-      Function();
-    } catch (const std::exception &e) {
-      message = e.what();
-      if (e.what() == expected)
-        ok = true;
-    }
-    if (ok == Negated) {
-      std::ostringstream os;
-      os << "expect to " << (Negated ? "not " : "") << "throw " << expected
-         << " but received " << message;
-      throw AssertionError(os.str());
-    }
-  }
-
 private:
   Void Function;
   bool Negated;
