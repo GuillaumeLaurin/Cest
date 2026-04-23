@@ -151,24 +151,22 @@ public:
 
   template <typename Expected>
   void toStrictEqual(const Expected &expected) const {
-    bool sameType =
-        std::is_same_v<std::remove_cv_t<std::remove_reference_t<Actual>>,
-                       std::remove_cv_t<std::remove_reference_t<Expected>>>;
+    using A = std::remove_cv_t<std::remove_reference_t<Actual>>;
+    using E = std::remove_cv_t<std::remove_reference_t<Expected>>;
 
-    if (!sameType) {
+    if constexpr (!std::is_same_v<A, E>) {
       if (!Negated)
         fail("toStrictEqual", detail::toStringSafe(expected));
       return;
-    }
+    } else {
+      bool eq = deepEqual(Value, expected);
 
-    bool eq = deepEqual(Value, expected);
-
-    if (eq == Negated) {
-      if constexpr (detail::is_container_v<Actual> &&
-                    detail::is_container_v<Expected>) {
-        fail("toStrictEqual", containerDiff(expected));
-      } else {
-        fail("toStrictEqual", detail::toStringSafe(expected));
+      if (eq == Negated) {
+        if constexpr (detail::is_container_v<A> && detail::is_container_v<E>) {
+          fail("toStrictEqual", containerDiff(expected));
+        } else {
+          fail("toStrictEqual", detail::toStringSafe(expected));
+        }
       }
     }
   }
