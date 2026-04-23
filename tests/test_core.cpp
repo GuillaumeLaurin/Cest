@@ -1,6 +1,9 @@
 #include "cest/core.hpp"
 
+#include <array>
 #include <cfloat>
+#include <map>
+#include <set>
 
 #define EXPECT_THROWS(expr) cest::expect(cest::Void([&]() { expr; })).toThrow()
 
@@ -281,6 +284,223 @@ TEST_SUITE("expect: toContain") {
              [v]() { cest::expect(v).toContain(std::string("bar")); });
     cest::it(".Not() passes when string is absent",
              [v]() { cest::expect(v).Not().toContain(std::string("qux")); });
+  });
+}
+
+TEST_SUITE("expect: container matchers — std::vector") {
+  cest::describe("toContain", []() {
+    const std::vector<int> v = {10, 20, 30};
+
+    cest::it("passes when element is present",
+             [v]() { cest::expect(v).toContain(20); });
+    cest::it("fails when element is absent",
+             [v]() { EXPECT_THROWS(cest::expect(v).toContain(99)); });
+    cest::it(".Not() passes when element is absent",
+             [v]() { cest::expect(v).Not().toContain(99); });
+    cest::it(".Not() fails when element is present",
+             [v]() { EXPECT_THROWS(cest::expect(v).Not().toContain(10)); });
+  });
+
+  cest::describe("toContainEqual", []() {
+    const std::vector<std::vector<int>> v = {{1, 2}, {3, 4}, {5, 6}};
+
+    cest::it("passes for a matching nested vector",
+             [v]() { cest::expect(v).toContainEqual(std::vector<int>{3, 4}); });
+    cest::it("fails when no element matches", [v]() {
+      EXPECT_THROWS(cest::expect(v).toContainEqual(std::vector<int>{7, 8}));
+    });
+    cest::it(".Not() passes when no element matches", [v]() {
+      cest::expect(v).Not().toContainEqual(std::vector<int>{7, 8});
+    });
+  });
+
+  cest::describe("toHaveLength", []() {
+    const std::vector<int> v = {1, 2, 3};
+    const std::vector<int> empty = {};
+
+    cest::it("passes for the correct length",
+             [v]() { cest::expect(v).toHaveLength(3); });
+    cest::it("fails for the wrong length",
+             [v]() { EXPECT_THROWS(cest::expect(v).toHaveLength(99)); });
+    cest::it("passes for length 0 on empty vector",
+             [empty]() { cest::expect(empty).toHaveLength(0); });
+  });
+
+  cest::describe("toBeEmpty", []() {
+    const std::vector<int> empty = {};
+    const std::vector<int> nonempty = {1};
+
+    cest::it("passes on empty vector",
+             [empty]() { cest::expect(empty).toBeEmpty(); });
+    cest::it("fails on non-empty vector", [nonempty]() {
+      EXPECT_THROWS(cest::expect(nonempty).toBeEmpty());
+    });
+    cest::it(".Not() passes on non-empty vector",
+             [nonempty]() { cest::expect(nonempty).Not().toBeEmpty(); });
+  });
+}
+
+TEST_SUITE("expect: container matchers — std::array") {
+  cest::describe("toContain", []() {
+    const std::array<int, 4> a = {1, 2, 3, 4};
+
+    cest::it("passes when element is present",
+             [a]() { cest::expect(a).toContain(3); });
+    cest::it("fails when element is absent",
+             [a]() { EXPECT_THROWS(cest::expect(a).toContain(99)); });
+    cest::it(".Not() passes when element is absent",
+             [a]() { cest::expect(a).Not().toContain(99); });
+  });
+
+  cest::describe("toContainEqual", []() {
+    const std::array<int, 4> a = {1, 2, 3, 4};
+
+    cest::it("passes for a matching element",
+             [a]() { cest::expect(a).toContainEqual(3); });
+    cest::it("fails when no element matches",
+             [a]() { EXPECT_THROWS(cest::expect(a).toContainEqual(99)); });
+    cest::it(".Not() passes when no element matches",
+             [a]() { cest::expect(a).Not().toContainEqual(99); });
+  });
+
+  cest::describe("toHaveLength", []() {
+    const std::array<std::string, 3> a = {"x", "y", "z"};
+
+    cest::it("passes for the correct length",
+             [a]() { cest::expect(a).toHaveLength(3); });
+    cest::it("fails for the wrong length",
+             [a]() { EXPECT_THROWS(cest::expect(a).toHaveLength(1)); });
+  });
+
+  cest::describe("toBeEmpty", []() {
+    const std::array<int, 0> empty = {};
+    const std::array<int, 3> nonempty = {1, 2, 3};
+
+    cest::it("passes on empty array (size 0)",
+             [empty]() { cest::expect(empty).toBeEmpty(); });
+    cest::it("fails on non-empty array", [nonempty]() {
+      EXPECT_THROWS(cest::expect(nonempty).toBeEmpty());
+    });
+    cest::it(".Not() passes on non-empty array",
+             [nonempty]() { cest::expect(nonempty).Not().toBeEmpty(); });
+  });
+}
+
+TEST_SUITE("expect: container matchers — std::map") {
+  cest::describe("toContain (pair)", []() {
+    const std::map<std::string, int> m = {{"a", 1}, {"b", 2}, {"c", 3}};
+    using P = std::pair<const std::string, int>;
+
+    cest::it("passes when the key-value pair is present",
+             [m]() { cest::expect(m).toContain(P{"b", 2}); });
+    cest::it("fails when the value differs",
+             [m]() { EXPECT_THROWS(cest::expect(m).toContain(P{"b", 99})); });
+    cest::it("fails when the key is absent",
+             [m]() { EXPECT_THROWS(cest::expect(m).toContain(P{"z", 1})); });
+    cest::it(".Not() passes when the pair is absent",
+             [m]() { cest::expect(m).Not().toContain(P{"z", 1}); });
+  });
+
+  cest::describe("toHaveLength", []() {
+    const std::map<int, int> m = {{1, 10}, {2, 20}};
+    const std::map<int, int> empty = {};
+
+    cest::it("passes for the correct length",
+             [m]() { cest::expect(m).toHaveLength(2); });
+    cest::it("passes for length 0 on empty map",
+             [empty]() { cest::expect(empty).toHaveLength(0); });
+  });
+
+  cest::describe("toBeEmpty", []() {
+    const std::map<int, int> empty = {};
+    const std::map<int, int> nonempty = {{1, 1}};
+
+    cest::it("passes on empty map",
+             [empty]() { cest::expect(empty).toBeEmpty(); });
+    cest::it("fails on non-empty map", [nonempty]() {
+      EXPECT_THROWS(cest::expect(nonempty).toBeEmpty());
+    });
+  });
+}
+
+TEST_SUITE("expect: container matchers — std::set") {
+  cest::describe("toContain", []() {
+    const std::set<int> s = {10, 20, 30};
+
+    cest::it("passes when element is present",
+             [s]() { cest::expect(s).toContain(20); });
+    cest::it("fails when element is absent",
+             [s]() { EXPECT_THROWS(cest::expect(s).toContain(99)); });
+    cest::it(".Not() passes when element is absent",
+             [s]() { cest::expect(s).Not().toContain(99); });
+  });
+
+  cest::describe("toContainEqual", []() {
+    const std::set<int> s = {10, 20, 30};
+
+    cest::it("passes for a matching element",
+             [s]() { cest::expect(s).toContainEqual(20); });
+    cest::it("fails when no element matches",
+             [s]() { EXPECT_THROWS(cest::expect(s).toContainEqual(99)); });
+    cest::it(".Not() passes when no element matches",
+             [s]() { cest::expect(s).Not().toContainEqual(99); });
+  });
+
+  cest::describe("toBeEmpty", []() {
+    const std::set<std::string> empty = {};
+    const std::set<std::string> nonempty = {"hello"};
+
+    cest::it("passes on empty set",
+             [empty]() { cest::expect(empty).toBeEmpty(); });
+    cest::it("fails on non-empty set", [nonempty]() {
+      EXPECT_THROWS(cest::expect(nonempty).toBeEmpty());
+    });
+  });
+
+  cest::describe("toHaveLength", []() {
+    const std::set<int> s = {10, 20, 30};
+    const std::set<int> empty = {};
+
+    cest::it("passes for the correct length",
+             [s]() { cest::expect(s).toHaveLength(3); });
+    cest::it("fails for the wrong length",
+             [s]() { EXPECT_THROWS(cest::expect(s).toHaveLength(99)); });
+    cest::it("passes for length 0 on empty set",
+             [empty]() { cest::expect(empty).toHaveLength(0); });
+    cest::it(".Not() passes for the wrong length",
+             [s]() { cest::expect(s).Not().toHaveLength(99); });
+    cest::it(".Not() fails for the correct length",
+             [s]() { EXPECT_THROWS(cest::expect(s).Not().toHaveLength(3)); });
+  });
+}
+
+TEST_SUITE("expect: container matchers — std::string as container") {
+  cest::describe("toContain (char)", []() {
+    const std::string s = "hello";
+
+    cest::it("passes when char is present",
+             [s]() { cest::expect(s).toContain('e'); });
+    cest::it("fails when char is absent",
+             [s]() { EXPECT_THROWS(cest::expect(s).toContain('z')); });
+    cest::it(".Not() passes when char is absent",
+             [s]() { cest::expect(s).Not().toContain('z'); });
+  });
+
+  cest::describe("toHaveLength", []() {
+    const std::string s = "hello";
+
+    cest::it("passes for the correct length",
+             [s]() { cest::expect(s).toHaveLength(5); });
+    cest::it("passes for length 0 on empty string",
+             []() { cest::expect(std::string{}).toHaveLength(0); });
+  });
+
+  cest::describe("toBeEmpty", []() {
+    cest::it("passes on empty string",
+             []() { cest::expect(std::string{}).toBeEmpty(); });
+    cest::it("fails on non-empty string", []() {
+      EXPECT_THROWS(cest::expect(std::string{"x"}).toBeEmpty());
+    });
   });
 }
 

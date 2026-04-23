@@ -89,8 +89,50 @@ expect(std::string("hello world")).Not().toStartWith("world");
 ```
 
 ### Containers
-
-`toContain(needle)` — passes if any element of the iterable `value` compares equal to `needle`.
+ 
+These matchers are available for any type that satisfies the internal `is_container` concept: it must expose `value_type`, `begin()`, `end()`, and `size()`. This covers `std::vector`, `std::array`, `std::map`, `std::set`, `std::string`, and similar types.
+ 
+`toContain(needle)` — passes if any element in the container compares equal to `needle` using `operator==`.
+ 
+For `std::map`, the element type is `std::pair<const K, V>`, so `needle` must be a pair:
+ 
+```cpp
+std::map<std::string, int> m = {{"a", 1}, {"b", 2}};
+expect(m).toContain(std::pair<const std::string, int>{"b", 2});
+```
+ 
+For `std::string`, the element type is `char`, so `toContain` searches for a single character. Use `toMatch` for substring search.
+ 
+`toContainEqual(expected)` — passes if any element in the container compares equal to `expected` using `deepEqual`, which recurses into nested containers. `Expected` must be convertible to the container's `value_type`.
+ 
+```cpp
+std::vector<std::vector<int>> v = {{1, 2}, {3, 4}};
+expect(v).toContainEqual(std::vector<int>{3, 4});
+```
+ 
+`toHaveLength(n)` — passes if `value.size() == n`.
+ 
+```cpp
+expect(std::vector<int>{1, 2, 3}).toHaveLength(3);
+expect(std::string("hello")).toHaveLength(5);
+expect(std::set<int>{}).toHaveLength(0);
+```
+ 
+`toBeEmpty()` — passes if `value.empty()`.
+ 
+```cpp
+expect(std::vector<int>{}).toBeEmpty();
+expect(std::map<int,int>{}).toBeEmpty();
+expect(std::string{}).toBeEmpty();
+```
+ 
+All container matchers support `.Not()`:
+ 
+```cpp
+expect(std::vector<int>{1, 2, 3}).Not().toContain(99);
+expect(std::vector<int>{1, 2, 3}).Not().toBeEmpty();
+expect(std::vector<int>{1, 2, 3}).Not().toHaveLength(1);
+```
 
 ### Exceptions
 
@@ -351,7 +393,7 @@ When in doubt, read a neighbouring file and match it. If the neighbouring file i
     Fixes #42.
     ```
 - **Link the issue.** If a PR fixes an open issue, say `Fixes #N` in the commit body so GitHub auto-closes it on merge.
-- **Tests are required for behavioural changes.** A bug fix must come with a test that fails before the fix and passes after. A new matcher must come with tests for both the positive and the negated (`.Not()`) form. A new feature must come with at least one usage test in `examples/example.cpp`.
+- **Tests are required for behavioural changes.** A bug fix must come with a test that fails before the fix and passes after. A new matcher must come with tests for both the positive and the negated (`.Not()`) form. A new feature must come with at least one usage test in `examples/example.cpp`. A new container matcher must be tested against at least `std::vector`, `std::string`, and one associative container (`std::map` or `std::set`). Document any type-specific caveat (e.g. `std::map` requires a pair, `std::string` element type is `char`) in both the test file and the README.
 - **Documentation changes alongside code changes.** If you add a public API, update the README in the same PR. Documentation drift is worse than no documentation.
 - **CI must be green before review.** PRs with a red CI will be ignored until they are green. If CI is flaky (not your fault), comment on the PR and re-run; don't silently push a merge commit.
 

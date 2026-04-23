@@ -95,6 +95,33 @@ template <typename T> std::string toStringSafe(const T &v) {
     return "<non-printable>";
   }
 }
+
+template <typename T, typename = void> struct is_container : std::false_type {};
+
+template <typename T>
+struct is_container<T, std::void_t<typename T::value_type, typename T::iterator,
+                                   decltype(std::declval<T>().begin()),
+                                   decltype(std::declval<T>().end()),
+                                   decltype(std::declval<T>().size())>>
+    : std::true_type {};
+
+template <typename T>
+inline constexpr bool is_container_v = is_container<T>::value;
+
+template <typename T, typename U>
+inline bool deepEqual(const T &a, const U &b) {
+  if constexpr (detail::is_container_v<T> && detail::is_container_v<U>) {
+    if (a.size() != b.size())
+      return false;
+    auto itA = a.begin(), itB = b.begin();
+    for (; itA != a.end(); ++itA, ++itB)
+      if (!deepEqual(*itA, *itB))
+        return false;
+    return true;
+  } else {
+    return a == b;
+  }
+}
 } // namespace detail
 
 template <typename Actual> class Expectation {
@@ -284,7 +311,13 @@ public:
       fail("toEndWith", detail::toStringSafe(suffix));
   }
 
-  template <typename Needle> void toContain(const Needle &needle) const {
+  //
+  // Container Matchers
+  //
+
+  template <typename Needle, typename A = Actual,
+            std::enable_if_t<detail::is_container_v<A>, int> = 0>
+  void toContain(const Needle &needle) const {
     bool found = false;
     for (const auto &actual : Value) {
       if (actual == needle) {
@@ -294,6 +327,40 @@ public:
     }
     if (found == Negated)
       fail("toContain", detail::toStringSafe(needle));
+  }
+
+  template <typename A = Actual,
+            std::enable_if_t<detail::is_container_v<A>, int> = 0>
+  void toHaveLength(const std::size_t &length) {
+    bool r = Value.size() == length;
+    if (r == Negated)
+      fail("toHaveLength", detail::toStringSafe(length));
+  }
+
+  template <
+      typename Expected, typename A = Actual,
+      std::enable_if_t<detail::is_container_v<A>, int> = 0,
+      std::enable_if_t<std::is_convertible_v<Expected, typename A::value_type>,
+                       int> = 0>
+  void toContainEqual(const Expected &expected) {
+    bool found = false;
+    for (const auto &elem : Value) {
+      if (detail::deepEqual(elem, expected)) {
+        found = true;
+        break;
+      }
+    }
+    if (found == Negated)
+      fail("toContainEqual", detail::toStringSafe(expected));
+  }
+
+  template <typename A = Actual,
+            std::enable_if_t<detail::is_container_v<A>, int> = 0>
+  void toBeEmpty() {
+    bool r = Value.empty();
+
+    if (r == Negated)
+      fail("toBeEmpty", "size=" + detail::toStringSafe(Value.size()));
   }
 
 private:
@@ -626,7 +693,7 @@ private:
       HasFocus = true;
     }
 
-    for (auto child : s.Children) {
+    for (auto &child : s.Children) {
       dryRun(child);
 
       if (child.Focussed || child.HasFocussedDescendant) {
