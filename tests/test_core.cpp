@@ -352,6 +352,17 @@ TEST_SUITE("expect: container matchers — std::array") {
              [a]() { cest::expect(a).Not().toContain(99); });
   });
 
+  cest::describe("toContainEqual", []() {
+    const std::array<int, 4> a = {1, 2, 3, 4};
+
+    cest::it("passes for a matching element",
+             [a]() { cest::expect(a).toContainEqual(3); });
+    cest::it("fails when no element matches",
+             [a]() { EXPECT_THROWS(cest::expect(a).toContainEqual(99)); });
+    cest::it(".Not() passes when no element matches",
+             [a]() { cest::expect(a).Not().toContainEqual(99); });
+  });
+
   cest::describe("toHaveLength", []() {
     const std::array<std::string, 3> a = {"x", "y", "z"};
 
@@ -422,6 +433,17 @@ TEST_SUITE("expect: container matchers — std::set") {
              [s]() { EXPECT_THROWS(cest::expect(s).toContain(99)); });
     cest::it(".Not() passes when element is absent",
              [s]() { cest::expect(s).Not().toContain(99); });
+  });
+
+  cest::describe("toContainEqual", []() {
+    const std::set<int> s = {10, 20, 30};
+
+    cest::it("passes for a matching element",
+             [s]() { cest::expect(s).toContainEqual(20); });
+    cest::it("fails when no element matches",
+             [s]() { EXPECT_THROWS(cest::expect(s).toContainEqual(99)); });
+    cest::it(".Not() passes when no element matches",
+             [s]() { cest::expect(s).Not().toContainEqual(99); });
   });
 
   cest::describe("toBeEmpty", []() {
