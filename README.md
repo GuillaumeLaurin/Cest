@@ -136,9 +136,44 @@ expect(std::vector<int>{1, 2, 3}).Not().toHaveLength(1);
 
 ### Exceptions
 
+These matchers are available when `expect` receives a `cest::Void` (i.e. a
+`std::function<void()>`).
+
 `toThrow()` — passes if the callable throws any exception.
 
-`toThrowType<E>()` — passes if the callable throws an exception of type `E` (caught by `catch (const E &)`).
+`toThrowType<E>()` — passes if the callable throws an exception of type `E`
+(caught by `catch (const E &)`).
+
+`toThrowMessage(expected)` — passes if the callable throws a `std::exception`
+whose `what()` string equals `expected`. Accepts `std::string` or `const char *`
+(the `const char *` overload is removed; string literals are implicitly converted
+to `std::string`).
+
+```cpp
+expect(cest::Void([] { throw std::runtime_error("boom"); })).toThrow();
+
+expect(cest::Void([] { throw std::runtime_error("err"); }))
+    .toThrowType();
+
+expect(cest::Void([] { throw std::runtime_error("exact message"); }))
+    .toThrowMessage("exact message");
+```
+
+All three matchers support `.Not()`:
+
+```cpp
+expect(cest::Void([] {})).Not().toThrow();
+
+expect(cest::Void([] { throw std::logic_error("other"); }))
+    .Not().toThrowType();
+
+expect(cest::Void([] { throw std::runtime_error("actual"); }))
+    .Not().toThrowMessage("different");
+```
+
+> **Note:** `toThrowMessage` only catches `std::exception` and its subclasses.
+> A callable that throws an unrelated type (e.g. a raw `int`) will not be
+> caught and the matcher will fail.
 
 ### Negation
 
