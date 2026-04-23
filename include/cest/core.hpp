@@ -511,8 +511,8 @@ template <typename T> Expectation<T> expect(T value) {
   return Expectation<T>(std::move(value));
 }
 
-inline ThrowingExpectation expect(Void function) {
-  return ThrowingExpectation(std::move(function));
+inline ThrowingExpectation expect(Void value) {
+  return ThrowingExpectation(std::move(value));
 }
 
 struct TestCase {
