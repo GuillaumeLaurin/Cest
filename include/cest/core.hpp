@@ -128,22 +128,25 @@ template <typename T> std::string toStringSafe(const T &v) {
 
 } // namespace detail
 
-template <typename Actual> class AbsExpectation {
+template <typename Actual, typename Derived> class AbsExpectation {
 public:
   AbsExpectation(Actual value, bool negated = false)
       : Value(value), Negated(negated) {}
 
   virtual ~AbsExpectation() = default;
 
+  Derived Not() const { return Derived(this->Value, !this->Negated); }
+
 protected:
   Actual Value;
   bool Negated;
 };
 
-template <typename Actual> class Expectation : public AbsExpectation<Actual> {
+template <typename Actual>
+class Expectation : public AbsExpectation<Actual, Expectation<Actual>> {
 public:
   Expectation(Actual value, bool negated = false)
-      : AbsExpectation<Actual>(value, negated) {}
+      : AbsExpectation<Actual, Expectation<Actual>>(value, negated) {}
 
   Expectation<Actual> Not() const {
     return Expectation<Actual>(this->Value, !this->Negated);
@@ -454,14 +457,10 @@ private:
   }
 };
 
-class ThrowingExpectation : public AbsExpectation<Void> {
+class ThrowingExpectation : public AbsExpectation<Void, ThrowingExpectation> {
 public:
   ThrowingExpectation(Void value, bool negated = false)
-      : AbsExpectation<Void>(value, negated) {}
-
-  ThrowingExpectation Not() const {
-    return ThrowingExpectation(Value, !Negated);
-  }
+      : AbsExpectation<Void, ThrowingExpectation>(value, negated) {}
 
   void toThrow() const {
     bool threw = false;
