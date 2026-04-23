@@ -148,10 +148,6 @@ public:
   Expectation(Actual value, bool negated = false)
       : AbsExpectation<Actual, Expectation<Actual>>(value, negated) {}
 
-  Expectation<Actual> Not() const {
-    return Expectation<Actual>(this->Value, !this->Negated);
-  }
-
   template <typename Expected> void toBe(const Expected &expected) const {
     bool eq = (this->Value == expected);
     if (eq == this->Negated)
