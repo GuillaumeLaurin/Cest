@@ -434,6 +434,22 @@ TEST_SUITE("expect: container matchers — std::set") {
       EXPECT_THROWS(cest::expect(nonempty).toBeEmpty());
     });
   });
+
+  cest::describe("toHaveLength", []() {
+    const std::set<int> s = {10, 20, 30};
+    const std::set<int> empty = {};
+
+    cest::it("passes for the correct length",
+             [s]() { cest::expect(s).toHaveLength(3); });
+    cest::it("fails for the wrong length",
+             [s]() { EXPECT_THROWS(cest::expect(s).toHaveLength(99)); });
+    cest::it("passes for length 0 on empty set",
+             [empty]() { cest::expect(empty).toHaveLength(0); });
+    cest::it(".Not() passes for the wrong length",
+             [s]() { cest::expect(s).Not().toHaveLength(99); });
+    cest::it(".Not() fails for the correct length",
+             [s]() { EXPECT_THROWS(cest::expect(s).Not().toHaveLength(3)); });
+  });
 }
 
 TEST_SUITE("expect: container matchers — std::string as container") {
