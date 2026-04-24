@@ -94,6 +94,12 @@ struct is_container<T, std::void_t<typename T::value_type, typename T::iterator,
 template <typename T>
 inline constexpr bool is_container_v = is_container<T>::value;
 
+template <typename T, typename MatcherTag>
+struct has_matcher : std::false_type {};
+
+template <typename T, typename MatcherTag>
+concept HasMatcher = has_matcher<T, MatcherTag>::value;
+
 /**
  * @brief Converts safely a type T to string if the type is streamable
  * @returns a string
@@ -891,24 +897,29 @@ inline void afterEach(Void function) {
   static void CEST_CAT(cest_suite_fn_, __LINE__)()
 
 #define CEST_MATCHER(Name, Type, Predicate, Description)                       \
-  namespace {                                                                  \
+  struct CEST_CAT(Tag_, Name) {};                                              \
+  namespace detail {                                                           \
+  template <>                                                                  \
+  struct has_matcher<Type, CEST_CAT(Tag_, Name)> : std::true_type {};          \
+  }                                                                            \
+                                                                               \
   class CEST_CAT(Expectation, Name)                                            \
-      : public cest::AbsExpectation<Type, CEST_CAT(Expectation, Name)> {       \
+      : public AbsExpectation<Type, CEST_CAT(Expectation, Name)> {             \
   public:                                                                      \
     CEST_CAT(Expectation, Name)(Type value, bool negated = false)              \
-        : cest::AbsExpectation<Type, CEST_CAT(Expectation, Name)>(value,       \
-                                                                  negated) {}  \
+        : AbsExpectation<Type, CEST_CAT(Expectation, Name)>(value, negated) {} \
                                                                                \
     void Name() const {                                                        \
       auto pred = Predicate;                                                   \
-      bool r = pred(this->Value);                                              \
+      bool r = pred(this->value);                                              \
       if (r == this->Negated)                                                  \
         this->fail(#Name, Description);                                        \
     }                                                                          \
   };                                                                           \
-  inline CEST_CAT(Expectation, Name) expect(Type value) {                      \
+                                                                               \
+  template <detail::HasMatcher<CEST_CAT(Tag_, Name)> T>                        \
+  inline CEST_CAT(Expectation, Name) expect(T value) {                         \
     return CEST_CAT(Expectation, Name)(std::move(value));                      \
-  }                                                                            \
   }
 } // namespace cest
 
