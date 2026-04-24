@@ -1,6 +1,6 @@
 # cest
 
-A header-only C++17 test library inspired by Jest, with `describe` / `it` / `expect`, lifecycle hooks, and a two-tier mocking module — **without inheritance**.
+A header-only C++20 test library inspired by Jest, with `describe` / `it` / `expect`, lifecycle hooks, and a two-tier mocking module — **without inheritance**.
 
 ## Overview
 
@@ -19,7 +19,7 @@ TEST_SUITE(Math) {
 }
 ```
 
-Compile with `-std=c++17 -I include`, run the binary, and you get Jest-style coloured output.
+Compile with `-std=c++20 -I include`, run the binary, and you get Jest-style coloured output.
 
 ## Matchers
 
@@ -412,7 +412,7 @@ cmake .. && cmake --build .
 Or by hand:
 
 ```bash
-g++ -std=c++17 -O0 -fno-inline -I include examples/example.cpp -o example
+g++ -std=c++20 -O0 -fno-inline -I include examples/example.cpp -o example
 ./example
 ```
 

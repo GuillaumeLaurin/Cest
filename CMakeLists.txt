@@ -18,12 +18,12 @@ cest_read_version(CEST_VERSION
 )
 
 project(${Cest_ns}
-  DESCRIPTION "A header-only C++17 test library inspired by Jest"
+  DESCRIPTION "A header-only C++20 test library inspired by Jest"
   LANGUAGES CXX
   VERSION ${CEST_VERSION}
 )
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED YES)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_AUTOMOC OFF)
