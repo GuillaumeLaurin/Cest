@@ -895,14 +895,15 @@ inline void afterEach(Void function) {
       CEST_CAT(cest_suite_reg_, __LINE__);                                     \
   }                                                                            \
   static void CEST_CAT(cest_suite_fn_, __LINE__)()
+} // namespace cest
 
 #define CEST_MATCHER(Name, Type, Predicate, Description)                       \
   struct CEST_CAT(Tag_, Name) {};                                              \
-  namespace detail {                                                           \
+  namespace cest::detail {                                                     \
   template <>                                                                  \
   struct has_matcher<Type, CEST_CAT(Tag_, Name)> : std::true_type {};          \
   }                                                                            \
-                                                                               \
+  namespace cest {                                                             \
   class CEST_CAT(Expectation, Name)                                            \
       : public AbsExpectation<Type, CEST_CAT(Expectation, Name)> {             \
   public:                                                                      \
@@ -911,7 +912,7 @@ inline void afterEach(Void function) {
                                                                                \
     void Name() const {                                                        \
       auto pred = Predicate;                                                   \
-      bool r = pred(this->value);                                              \
+      bool r = pred(this->Value);                                              \
       if (r == this->Negated)                                                  \
         this->fail(#Name, Description);                                        \
     }                                                                          \
@@ -920,8 +921,8 @@ inline void afterEach(Void function) {
   template <detail::HasMatcher<CEST_CAT(Tag_, Name)> T>                        \
   inline CEST_CAT(Expectation, Name) expect(T value) {                         \
     return CEST_CAT(Expectation, Name)(std::move(value));                      \
+  }                                                                            \
   }
-} // namespace cest
 
 #ifdef CEST_MAIN
 int main() { return ::cest::Runner::instance().run(); }

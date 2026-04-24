@@ -38,6 +38,9 @@ function(cest_common target)
       /utf-8
       /Zc:__cplusplus
       /Zc:strictStrings
+      # Improves conformance
+      /permissive-
+      /std:c++20
     )
 
     if(NOT CEST_VCPKG)
