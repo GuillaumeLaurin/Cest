@@ -140,6 +140,13 @@ public:
 protected:
   Actual Value;
   bool Negated;
+
+  void fail(const char *matcher, const std::string &expected) const {
+    std::ostringstream os;
+    os << "expect(...)" << (this->Negated ? ".not." : ".") << matcher << "("
+       << expected << ")";
+    throw AssertionError(os.str());
+  }
 };
 
 template <typename Actual>
@@ -151,13 +158,13 @@ public:
   template <typename Expected> void toBe(const Expected &expected) const {
     bool eq = (this->Value == expected);
     if (eq == this->Negated)
-      fail("toBe", detail::toStringSafe(expected));
+      this->fail("toBe", detail::toStringSafe(expected));
   }
 
   template <typename Expected> void toEqual(const Expected &expected) const {
     bool eq = (this->Value == expected);
     if (eq == this->Negated)
-      fail("toEqual", detail::toStringSafe(expected));
+      this->fail("toEqual", detail::toStringSafe(expected));
   }
 
   template <typename Expected>
@@ -167,16 +174,16 @@ public:
 
     if constexpr (!std::is_same_v<A, E>) {
       if (!this->Negated)
-        fail("toStrictEqual", detail::toStringSafe(expected));
+        this->fail("toStrictEqual", detail::toStringSafe(expected));
       return;
     } else {
       bool eq = deepEqual(this->Value, expected);
 
       if (eq == this->Negated) {
         if constexpr (detail::is_container_v<A> && detail::is_container_v<E>) {
-          fail("toStrictEqual", containerDiff(expected));
+          this->fail("toStrictEqual", containerDiff(expected));
         } else {
-          fail("toStrictEqual", detail::toStringSafe(expected));
+          this->fail("toStrictEqual", detail::toStringSafe(expected));
         }
       }
     }
@@ -185,13 +192,13 @@ public:
   void toBeTruthy() const {
     bool t = static_cast<bool>(this->Value);
     if (t == this->Negated)
-      fail("toBeTruthy", "truthy value");
+      this->fail("toBeTruthy", "truthy value");
   }
 
   void toBeFalsy() const {
     bool t = static_cast<bool>(this->Value);
     if ((!t) == this->Negated)
-      fail("toBeFalsy", "falsy value");
+      this->fail("toBeFalsy", "falsy value");
   }
 
   //
@@ -205,7 +212,7 @@ public:
   void toBeGreaterThan(const Expected &expected) const {
     bool r = (this->Value > expected);
     if (r == this->Negated)
-      fail("toBeGreaterThan", detail::toStringSafe(expected));
+      this->fail("toBeGreaterThan", detail::toStringSafe(expected));
   }
 
   template <typename Expected,
@@ -215,7 +222,7 @@ public:
   void toBeGreaterThanOrEqual(const Expected &expected) const {
     bool r = (this->Value >= expected);
     if (r == this->Negated)
-      fail("toBeGreaterThanOrEqual", detail::toStringSafe(expected));
+      this->fail("toBeGreaterThanOrEqual", detail::toStringSafe(expected));
   }
 
   template <typename Expected,
@@ -225,7 +232,7 @@ public:
   void toBeLessThan(const Expected &expected) const {
     bool r = (this->Value < expected);
     if (r == this->Negated)
-      fail("toBeLessThan", detail::toStringSafe(expected));
+      this->fail("toBeLessThan", detail::toStringSafe(expected));
   }
 
   template <typename Expected,
@@ -235,7 +242,7 @@ public:
   void toBeLessThanOrEqual(const Expected &expected) const {
     bool r = (this->Value <= expected);
     if (r == this->Negated)
-      fail("toBeLessThanOrEqual", detail::toStringSafe(expected));
+      this->fail("toBeLessThanOrEqual", detail::toStringSafe(expected));
   }
 
   template <typename A = Actual,
@@ -244,8 +251,8 @@ public:
     float tolerance = std::pow(10.f, static_cast<float>(-precision)) / 2.0f;
     bool r = std::abs(this->Value - expected) < tolerance;
     if (r == this->Negated)
-      fail("toBeCloseTo", detail::toStringSafe(expected) + " ±" +
-                              detail::toStringSafe(tolerance));
+      this->fail("toBeCloseTo", detail::toStringSafe(expected) + " ±" +
+                                    detail::toStringSafe(tolerance));
   }
 
   template <typename A = Actual,
@@ -254,8 +261,8 @@ public:
     double tolerance = std::pow(10.0, -static_cast<int>(precision)) / 2.0;
     bool r = std::abs(this->Value - expected) < tolerance;
     if (r == this->Negated)
-      fail("toBeCloseTo", detail::toStringSafe(expected) + " ±" +
-                              detail::toStringSafe(tolerance));
+      this->fail("toBeCloseTo", detail::toStringSafe(expected) + " ±" +
+                                    detail::toStringSafe(tolerance));
   }
 
   template <typename A = Actual,
@@ -263,7 +270,7 @@ public:
   void toBeNaN() {
     bool r = std::isnan(this->Value);
     if (r == this->Negated)
-      fail("toBeNaN", "NaN");
+      this->fail("toBeNaN", "NaN");
   }
 
   template <typename A = Actual,
@@ -271,7 +278,7 @@ public:
   void toBeFinite() {
     bool r = std::isfinite(this->Value);
     if (r == this->Negated)
-      fail("toBeFinite", "finite");
+      this->fail("toBeFinite", "finite");
   }
 
   template <typename A = Actual,
@@ -279,7 +286,7 @@ public:
   void toBeInfinite() {
     bool r = std::isinf(this->Value);
     if (r == this->Negated)
-      fail("toBeInfinite", "infinite");
+      this->fail("toBeInfinite", "infinite");
   }
 
   //
@@ -291,7 +298,7 @@ public:
   void toMatch(const std::string &sub) {
     bool r = std::string(this->Value).find(sub) != std::string::npos;
     if (r == this->Negated)
-      fail("toMatch", "\"" + sub + "\"");
+      this->fail("toMatch", "\"" + sub + "\"");
   }
 
   template <typename A = Actual,
@@ -299,7 +306,7 @@ public:
   void toMatch(const char *sub) {
     bool r = std::string(this->Value).find(sub) != std::string::npos;
     if (r == this->Negated)
-      fail("toMatch", "\"" + std::string(sub) + "\"");
+      this->fail("toMatch", "\"" + std::string(sub) + "\"");
   }
 
   template <typename A = Actual,
@@ -313,7 +320,7 @@ public:
       }
     }
     if (found == this->Negated)
-      fail("toMatch", "/" + regex.Pattern + "/");
+      this->fail("toMatch", "/" + regex.Pattern + "/");
   }
 
   template <typename A = Actual,
@@ -321,7 +328,7 @@ public:
   void toStartWith(const std::string &prefix) {
     bool r = std::string(this->Value).rfind(prefix, 0) == 0;
     if (r == this->Negated)
-      fail("toStartWith", detail::toStringSafe(prefix));
+      this->fail("toStartWith", detail::toStringSafe(prefix));
   }
 
   template <typename A = Actual,
@@ -329,7 +336,7 @@ public:
   void toStartWith(const char *prefix) {
     bool r = std::string(this->Value).rfind(prefix, 0) == 0;
     if (r == this->Negated)
-      fail("toStartWith", detail::toStringSafe(prefix));
+      this->fail("toStartWith", detail::toStringSafe(prefix));
   }
 
   template <typename A = Actual,
@@ -337,7 +344,7 @@ public:
   void toEndWith(const std::string &suffix) {
     bool r = detail::endsWith(std::string(this->Value), suffix);
     if (r == this->Negated)
-      fail("toEndWith", detail::toStringSafe(suffix));
+      this->fail("toEndWith", detail::toStringSafe(suffix));
   }
 
   template <typename A = Actual,
@@ -345,7 +352,7 @@ public:
   void toEndWith(const char *suffix) {
     bool r = detail::endsWith(std::string(this->Value), suffix);
     if (r == this->Negated)
-      fail("toEndWith", detail::toStringSafe(suffix));
+      this->fail("toEndWith", detail::toStringSafe(suffix));
   }
 
   //
@@ -363,7 +370,7 @@ public:
       }
     }
     if (found == this->Negated)
-      fail("toContain", detail::toStringSafe(needle));
+      this->fail("toContain", detail::toStringSafe(needle));
   }
 
   template <typename A = Actual,
@@ -371,7 +378,7 @@ public:
   void toHaveLength(const std::size_t &length) {
     bool r = this->Value.size() == length;
     if (r == this->Negated)
-      fail("toHaveLength", detail::toStringSafe(length));
+      this->fail("toHaveLength", detail::toStringSafe(length));
   }
 
   template <
@@ -388,7 +395,7 @@ public:
       }
     }
     if (found == this->Negated)
-      fail("toContainEqual", detail::toStringSafe(expected));
+      this->fail("toContainEqual", detail::toStringSafe(expected));
   }
 
   template <typename A = Actual,
@@ -397,18 +404,11 @@ public:
     bool r = this->Value.empty();
 
     if (r == this->Negated)
-      fail("toBeEmpty", "size=" + detail::toStringSafe(this->Value.size()));
+      this->fail("toBeEmpty",
+                 "size=" + detail::toStringSafe(this->Value.size()));
   }
 
 private:
-  void fail(const char *matcher, const std::string &expected_str) const {
-    std::ostringstream os;
-    os << "expect(" << detail::toStringSafe(this->Value) << ")"
-       << (this->Negated ? ".not." : ".") << matcher << "(" << expected_str
-       << ")";
-    throw AssertionError(os.str());
-  }
-
   template <typename T, typename U>
   inline bool deepEqual(const T &a, const U &b) const {
     if constexpr (detail::is_container_v<T> && detail::is_container_v<U>) {
@@ -890,6 +890,26 @@ inline void afterEach(Void function) {
   }                                                                            \
   static void CEST_CAT(cest_suite_fn_, __LINE__)()
 
+#define CEST_MATCHER(Name, Type, Predicate, Description)                       \
+  namespace {                                                                  \
+  class CEST_CAT(Expectation, Name)                                            \
+      : public cest::AbsExpectation<Type, CEST_CAT(Expectation, Name)> {       \
+  public:                                                                      \
+    CEST_CAT(Expectation, Name)(Type value, bool negated = false)              \
+        : cest::AbsExpectation<Type, CEST_CAT(Expectation, Name)>(value,       \
+                                                                  negated) {}  \
+                                                                               \
+    void Name() const {                                                        \
+      auto pred = Predicate;                                                   \
+      bool r = pred(this->Value);                                              \
+      if (r == this->Negated)                                                  \
+        this->fail(#Name, Description);                                        \
+    }                                                                          \
+  };                                                                           \
+  inline CEST_CAT(Expectation, Name) expect(Type value) {                      \
+    return CEST_CAT(Expectation, Name)(std::move(value));                      \
+  }                                                                            \
+  }
 } // namespace cest
 
 #ifdef CEST_MAIN
