@@ -149,8 +149,8 @@ protected:
 
   void fail(const char *matcher, const std::string &expected) const {
     std::ostringstream os;
-    os << "expect(...)" << (this->Negated ? ".not." : ".") << matcher << "("
-       << expected << ")";
+    os << "expect(" << detail::toStringSafe(this->Value) << ")"
+       << (this->Negated ? ".not." : ".") << matcher << "(" << expected << ")";
     throw AssertionError(os.str());
   }
 };
@@ -904,11 +904,14 @@ inline void afterEach(Void function) {
   struct has_matcher<Type, CEST_CAT(Tag_, Name)> : std::true_type {};          \
   }                                                                            \
   namespace cest {                                                             \
-  class CEST_CAT(Expectation, Name)                                            \
-      : public AbsExpectation<Type, CEST_CAT(Expectation, Name)> {             \
+  class CEST_CAT(Expectation, Name) : public Expectation<Type> {               \
   public:                                                                      \
     CEST_CAT(Expectation, Name)(Type value, bool negated = false)              \
-        : AbsExpectation<Type, CEST_CAT(Expectation, Name)>(value, negated) {} \
+        : Expectation<Type>(value, negated) {}                                 \
+                                                                               \
+    CEST_CAT(Expectation, Name) Not() const {                                  \
+      return CEST_CAT(Expectation, Name)(this->Value, !this->Negated);         \
+    }                                                                          \
                                                                                \
     void Name() const {                                                        \
       auto pred = Predicate;                                                   \
