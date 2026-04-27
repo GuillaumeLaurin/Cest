@@ -23,6 +23,131 @@ Compile with `-std=c++20 -I include`, run the binary, and you get Jest-style col
 
 ## Matchers
 
+## Custom matchers
+ 
+`CEST_MATCHER` lets you define your own type-specific matchers once and reuse
+them anywhere in your test suite with the same `expect(...).myMatcher()` syntax
+as built-in matchers.
+ 
+### Syntax
+ 
+```cpp
+CEST_MATCHER(Name, Type, Predicate, Description);
+```
+ 
+| Parameter     | What to pass                                                                 |
+|---------------|------------------------------------------------------------------------------|
+| `Name`        | The matcher method name (used as `expect(x).Name()`).                        |
+| `Type`        | The exact C++ type the matcher targets (e.g. `int`, `std::string`).          |
+| `Predicate`   | A callable `(const Type &) -> bool`. A lambda is the usual choice.           |
+| `Description` | A string literal shown in the failure message as the "expected" value.       |
+ 
+The macro must be placed at namespace scope, outside any function, `describe`,
+or `TEST_SUITE` block. Include `<cest/core.hpp>` before using it.
+ 
+### Basic example
+ 
+```cpp
+#include <cest/core.hpp>
+#include <string>
+ 
+// Define once — available in every TEST_SUITE in this translation unit.
+CEST_MATCHER(isEven, int, [](int n) { return n % 2 == 0; }, "even number");
+ 
+CEST_MATCHER(
+    isPalindrome, std::string,
+    [](const std::string &s) {
+      std::string r(s.rbegin(), s.rend());
+      return s == r;
+    },
+    "palindrome string");
+ 
+TEST_SUITE("Custom matcher demo") {
+  cest::describe("isEven", [] {
+    cest::it("passes for an even integer",
+             [] { cest::expect(4).isEven(); });
+ 
+    cest::it("fails for an odd integer", [] {
+      cest::expect(cest::Void([] { cest::expect(3).isEven(); })).toThrow();
+    });
+  });
+ 
+  cest::describe("isPalindrome", [] {
+    cest::it("passes for 'racecar'",
+             [] { cest::expect(std::string("racecar")).isPalindrome(); });
+    cest::it("fails for 'hello'", [] {
+      cest::expect(cest::Void([] {
+        cest::expect(std::string("hello")).isPalindrome();
+      })).toThrow();
+    });
+  });
+}
+```
+ 
+### Negation with `.Not()`
+ 
+Custom matchers compose with `.Not()` exactly like built-in ones:
+ 
+```cpp
+CEST_MATCHER(isEven, int, [](int n) { return n % 2 == 0; }, "even number");
+ 
+cest::expect(7).Not().isEven();   // passes — 7 is not even
+ 
+// Negated failure:
+cest::expect(cest::Void([] {
+  cest::expect(2).Not().isEven(); // throws — 2 IS even
+})).toThrow();
+```
+ 
+### Failure messages
+ 
+When a custom matcher fails it throws a `cest::AssertionError` whose `what()`
+string follows the same pattern as built-in matchers:
+ 
+```
+expect(<value>).<Name>(<Description>)       // positive failure
+expect(<value>).not.<Name>(<Description>)   // negated failure
+```
+ 
+Example for `isEven` on value `3`:
+ 
+```
+expect(3).isEven(even number)
+```
+ 
+### Coexistence with built-in matchers
+ 
+Registering a custom matcher for a type that already has built-in matchers (such
+as `int` or `std::string`) does **not** shadow the built-ins. Both overloads
+remain available:
+ 
+```cpp
+CEST_MATCHER(isEven, int, [](int n) { return n % 2 == 0; }, "even number");
+ 
+cest::expect(42).isEven();   // custom matcher
+cest::expect(42).toBe(42);   // built-in matcher — still works
+```
+ 
+C++ overload resolution picks the most-constrained `expect()` overload, so
+there is no ambiguity.
+ 
+### Sharing matchers across files
+ 
+Because `CEST_MATCHER` defines a free `expect()` overload at namespace scope,
+the cleanest way to share a matcher across multiple translation units is to put
+its definition in its own header and `#include` that header wherever needed:
+ 
+```
+// matchers/is_even.hpp
+#pragma once
+#include <cest/core.hpp>
+CEST_MATCHER(isEven, int, [](int n) { return n % 2 == 0; }, "even number");
+```
+ 
+Guard the header with `#pragma once` (or a traditional include guard) to prevent
+multiple-definition errors when the header is included from more than one file in
+the same translation unit.
+
 ### Equality
 
 `toBe(expected)` — passes if `value == expected` (using `operator==`).
