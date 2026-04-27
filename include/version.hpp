@@ -9,7 +9,7 @@ CEST_SYSTEM_HEADER
 #include "cest/macros/stringify.hpp"
 
 #define CEST_VERSION_MAJOR 0
-#define CEST_VERSION_MINOR 6
+#define CEST_VERSION_MINOR 7
 #define CEST_VERSION_BUGFIX 0
 #define CEST_VERSION_BUILD 0
 

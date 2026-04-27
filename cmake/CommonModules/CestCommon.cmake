@@ -15,7 +15,7 @@ function(cest_common target)
     set_target_properties(${target} PROPERTIES EXPORT_NAME ${CEST_NAMESPACE})
   endif()
 
-  target_compile_features(${target} INTERFACE cxx_std_17)
+  target_compile_features(${target} INTERFACE cxx_std_20)
 
   if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
     target_compile_definitions(${target} INTERFACE
@@ -38,6 +38,9 @@ function(cest_common target)
       /utf-8
       /Zc:__cplusplus
       /Zc:strictStrings
+      # Improves conformance
+      /permissive-
+      /std:c++20
     )
 
     if(NOT CEST_VCPKG)

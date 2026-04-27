@@ -5,4 +5,4 @@ add_executable(cest_examples
     03_basic_matcher_skip.cpp
 )
 target_link_libraries(cest_examples PRIVATE Cest::Cest)
-target_compile_features(cest_examples PRIVATE cxx_std_17)
+target_compile_features(cest_examples PRIVATE cxx_std_20)

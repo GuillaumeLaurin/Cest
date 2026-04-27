@@ -228,51 +228,47 @@ private:
   std::shared_ptr<State> Value;
 };
 
-template <typename Sig> class MockExpectation {
+template <typename Sig>
+class MockExpectation
+    : public AbsExpectation<MockFn<Sig>, MockExpectation<Sig>> {
 public:
-  MockExpectation(MockFn<Sig> mock, bool negated = false)
-      : Mock(std::move(mock)), Negated(negated) {}
-
-  MockExpectation<Sig> Not() const {
-    return MockExpectation<Sig>(Mock, !Negated);
-  }
+  MockExpectation(MockFn<Sig> value, bool negated = false)
+      : AbsExpectation<MockFn<Sig>, MockExpectation<Sig>>(std::move(value),
+                                                          negated) {}
 
   void toHaveBeenCalled() const {
-    bool r = Mock.wasCalled();
-    if (r == Negated)
+    bool r = this->Value.wasCalled();
+    if (r == this->Negated)
       fail("toHaveBeenCalled", "");
   }
 
   void toHaveBeenCalledTimes(size_t n) const {
-    bool r = Mock.wasCalledTimes(n);
-    if (r == Negated) {
+    bool r = this->Value.wasCalledTimes(n);
+    if (r == this->Negated) {
       std::ostringstream os;
-      os << n << " (actual: " << Mock.callCount() << ")";
+      os << n << " (actual: " << this->Value.callCount() << ")";
       fail("toHaveBeenCalledTimes", os.str());
     }
   }
 
   template <typename... Expected>
   void toHaveBeenCalledWith(const Expected &...expected) const {
-    bool r = Mock.wasCalledWith(expected...);
-    if (r == Negated)
-      fail("toHaveBeenCalledWith", Mock.describeCalls());
+    bool r = this->Value.wasCalledWith(expected...);
+    if (r == this->Negated)
+      fail("toHaveBeenCalledWith", this->Value.describeCalls());
   }
 
 private:
-  MockFn<Sig> Mock;
-  bool Negated;
-
   void fail(const char *matcher, const std::string &extra) const {
     std::ostringstream os;
-    os << "expect(mock)" << (Negated ? ".not." : ".") << matcher << "(" << extra
-       << ")";
+    os << "expect(mock)" << (this->Negated ? ".not." : ".") << matcher << "("
+       << extra << ")";
     throw AssertionError(os.str());
   }
 };
 
-template <typename Sig> MockExpectation<Sig> expect(MockFn<Sig> mock) {
-  return MockExpectation<Sig>(std::move(mock));
+template <typename Sig> MockExpectation<Sig> expect(MockFn<Sig> value) {
+  return MockExpectation<Sig>(std::move(value));
 }
 
 } // namespace cest

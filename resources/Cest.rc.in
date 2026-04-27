@@ -33,7 +33,7 @@ VS_VERSION_INFO VERSIONINFO
             BLOCK "040904B0"
             BEGIN
                 VALUE "CompanyName",      "Atom Solution\0"
-                VALUE "FileDescription",  "A header-only C++17 test library inspired by Jest\0"
+                VALUE "FileDescription",  "A header-only C++20 test library inspired by Jest\0"
                 VALUE "FileVersion",      VER_FILEVERSION_STR
                 VALUE "InternalName",     "Cest\0"
                 VALUE "LegalCopyright",   "Copyright (©) 2026 Guillaume Laurin\0"

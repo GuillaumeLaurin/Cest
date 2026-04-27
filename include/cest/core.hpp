@@ -11,6 +11,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
+#include <cstring>
 #include <exception>
 #include <functional>
 #include <iostream>
@@ -94,6 +95,12 @@ struct is_container<T, std::void_t<typename T::value_type, typename T::iterator,
 template <typename T>
 inline constexpr bool is_container_v = is_container<T>::value;
 
+template <typename T, typename MatcherTag>
+struct has_matcher : std::false_type {};
+
+template <typename T, typename MatcherTag>
+concept HasMatcher = has_matcher<T, MatcherTag>::value;
+
 /**
  * @brief Converts safely a type T to string if the type is streamable
  * @returns a string
@@ -128,25 +135,55 @@ template <typename T> std::string toStringSafe(const T &v) {
 
 } // namespace detail
 
-template <typename Actual> class Expectation {
+template <typename Actual, typename Derived> class AbsExpectation {
+public:
+  AbsExpectation(Actual value, bool negated = false)
+      : Value(value), Negated(negated) {}
+
+  virtual ~AbsExpectation() = default;
+
+  Derived Not() const { return Derived(this->Value, !this->Negated); }
+
+protected:
+  Actual Value;
+  bool Negated;
+
+  void fail(const char *matcher, const std::string &expected) const {
+    std::ostringstream os;
+    os << "expect(" << detail::toStringSafe(this->Value) << ")"
+       << (this->Negated ? ".not." : ".") << matcher << "(" << expected << ")";
+    throw AssertionError(os.str());
+  }
+};
+
+template <typename Actual>
+class Expectation : public AbsExpectation<Actual, Expectation<Actual>> {
 public:
   Expectation(Actual value, bool negated = false)
-      : Value(std::move(value)), Negated(negated) {}
-
-  Expectation<Actual> Not() const {
-    return Expectation<Actual>(Value, !Negated);
-  }
+      : AbsExpectation<Actual, Expectation<Actual>>(value, negated) {}
 
   template <typename Expected> void toBe(const Expected &expected) const {
-    bool eq = (Value == expected);
-    if (eq == Negated)
-      fail("toBe", detail::toStringSafe(expected));
+    bool eq;
+    if constexpr (std::is_floating_point_v<Actual> &&
+                  std::is_floating_point_v<Expected>) {
+      eq = (std::memcmp(&this->Value, &expected, sizeof(Actual)) == 0);
+    } else {
+      eq = (this->Value == expected);
+    }
+    if (eq == this->Negated)
+      this->fail("toBe", detail::toStringSafe(expected));
   }
 
   template <typename Expected> void toEqual(const Expected &expected) const {
-    bool eq = (Value == expected);
-    if (eq == Negated)
-      fail("toEqual", detail::toStringSafe(expected));
+    bool eq;
+    if constexpr (std::is_floating_point_v<Actual> &&
+                  std::is_floating_point_v<Expected>) {
+      eq = (std::memcmp(&this->Value, &expected, sizeof(Actual)) == 0);
+    } else {
+      eq = (this->Value == expected);
+    }
+    if (eq == this->Negated)
+      this->fail("toEqual", detail::toStringSafe(expected));
   }
 
   template <typename Expected>
@@ -155,32 +192,32 @@ public:
     using E = std::remove_cv_t<std::remove_reference_t<Expected>>;
 
     if constexpr (!std::is_same_v<A, E>) {
-      if (!Negated)
-        fail("toStrictEqual", detail::toStringSafe(expected));
+      if (!this->Negated)
+        this->fail("toStrictEqual", detail::toStringSafe(expected));
       return;
     } else {
-      bool eq = deepEqual(Value, expected);
+      bool eq = deepEqual(this->Value, expected);
 
-      if (eq == Negated) {
+      if (eq == this->Negated) {
         if constexpr (detail::is_container_v<A> && detail::is_container_v<E>) {
-          fail("toStrictEqual", containerDiff(expected));
+          this->fail("toStrictEqual", containerDiff(expected));
         } else {
-          fail("toStrictEqual", detail::toStringSafe(expected));
+          this->fail("toStrictEqual", detail::toStringSafe(expected));
         }
       }
     }
   }
 
   void toBeTruthy() const {
-    bool t = static_cast<bool>(Value);
-    if (t == Negated)
-      fail("toBeTruthy", "truthy value");
+    bool t = static_cast<bool>(this->Value);
+    if (t == this->Negated)
+      this->fail("toBeTruthy", "truthy value");
   }
 
   void toBeFalsy() const {
-    bool t = static_cast<bool>(Value);
-    if ((!t) == Negated)
-      fail("toBeFalsy", "falsy value");
+    bool t = static_cast<bool>(this->Value);
+    if ((!t) == this->Negated)
+      this->fail("toBeFalsy", "falsy value");
   }
 
   //
@@ -192,9 +229,9 @@ public:
                                  std::is_arithmetic_v<Expected>,
                              int> = 0>
   void toBeGreaterThan(const Expected &expected) const {
-    bool r = (Value > expected);
-    if (r == Negated)
-      fail("toBeGreaterThan", detail::toStringSafe(expected));
+    bool r = (this->Value > expected);
+    if (r == this->Negated)
+      this->fail("toBeGreaterThan", detail::toStringSafe(expected));
   }
 
   template <typename Expected,
@@ -202,9 +239,9 @@ public:
                                  std::is_arithmetic_v<Expected>,
                              int> = 0>
   void toBeGreaterThanOrEqual(const Expected &expected) const {
-    bool r = (Value >= expected);
-    if (r == Negated)
-      fail("toBeGreaterThanOrEqual", detail::toStringSafe(expected));
+    bool r = (this->Value >= expected);
+    if (r == this->Negated)
+      this->fail("toBeGreaterThanOrEqual", detail::toStringSafe(expected));
   }
 
   template <typename Expected,
@@ -212,9 +249,9 @@ public:
                                  std::is_arithmetic_v<Expected>,
                              int> = 0>
   void toBeLessThan(const Expected &expected) const {
-    bool r = (Value < expected);
-    if (r == Negated)
-      fail("toBeLessThan", detail::toStringSafe(expected));
+    bool r = (this->Value < expected);
+    if (r == this->Negated)
+      this->fail("toBeLessThan", detail::toStringSafe(expected));
   }
 
   template <typename Expected,
@@ -222,53 +259,53 @@ public:
                                  std::is_arithmetic_v<Expected>,
                              int> = 0>
   void toBeLessThanOrEqual(const Expected &expected) const {
-    bool r = (Value <= expected);
-    if (r == Negated)
-      fail("toBeLessThanOrEqual", detail::toStringSafe(expected));
+    bool r = (this->Value <= expected);
+    if (r == this->Negated)
+      this->fail("toBeLessThanOrEqual", detail::toStringSafe(expected));
   }
 
   template <typename A = Actual,
             std::enable_if_t<std::is_floating_point_v<A>, int> = 0>
   void toBeCloseTo(const float &expected, const uint8_t &precision = 2) {
     float tolerance = std::pow(10.f, static_cast<float>(-precision)) / 2.0f;
-    bool r = std::abs(Value - expected) < tolerance;
-    if (r == Negated)
-      fail("toBeCloseTo", detail::toStringSafe(expected) + " ±" +
-                              detail::toStringSafe(tolerance));
+    bool r = std::abs(this->Value - expected) < tolerance;
+    if (r == this->Negated)
+      this->fail("toBeCloseTo", detail::toStringSafe(expected) + " ±" +
+                                    detail::toStringSafe(tolerance));
   }
 
   template <typename A = Actual,
             std::enable_if_t<std::is_floating_point_v<A>, int> = 0>
   void toBeCloseTo(const double &expected, const uint8_t &precision = 2) {
     double tolerance = std::pow(10.0, -static_cast<int>(precision)) / 2.0;
-    bool r = std::abs(Value - expected) < tolerance;
-    if (r == Negated)
-      fail("toBeCloseTo", detail::toStringSafe(expected) + " ±" +
-                              detail::toStringSafe(tolerance));
+    bool r = std::abs(this->Value - expected) < tolerance;
+    if (r == this->Negated)
+      this->fail("toBeCloseTo", detail::toStringSafe(expected) + " ±" +
+                                    detail::toStringSafe(tolerance));
   }
 
   template <typename A = Actual,
             std::enable_if_t<std::is_floating_point_v<A>, int> = 0>
   void toBeNaN() {
-    bool r = std::isnan(Value);
-    if (r == Negated)
-      fail("toBeNaN", "NaN");
+    bool r = std::isnan(this->Value);
+    if (r == this->Negated)
+      this->fail("toBeNaN", "NaN");
   }
 
   template <typename A = Actual,
             std::enable_if_t<std::is_floating_point_v<A>, int> = 0>
   void toBeFinite() {
-    bool r = std::isfinite(Value);
-    if (r == Negated)
-      fail("toBeFinite", "finite");
+    bool r = std::isfinite(this->Value);
+    if (r == this->Negated)
+      this->fail("toBeFinite", "finite");
   }
 
   template <typename A = Actual,
             std::enable_if_t<std::is_floating_point_v<A>, int> = 0>
   void toBeInfinite() {
-    bool r = std::isinf(Value);
-    if (r == Negated)
-      fail("toBeInfinite", "infinite");
+    bool r = std::isinf(this->Value);
+    if (r == this->Negated)
+      this->fail("toBeInfinite", "infinite");
   }
 
   //
@@ -278,17 +315,17 @@ public:
   template <typename A = Actual,
             std::enable_if_t<std::is_convertible_v<A, std::string>, int> = 0>
   void toMatch(const std::string &sub) {
-    bool r = std::string(Value).find(sub) != std::string::npos;
-    if (r == Negated)
-      fail("toMatch", "\"" + sub + "\"");
+    bool r = std::string(this->Value).find(sub) != std::string::npos;
+    if (r == this->Negated)
+      this->fail("toMatch", "\"" + sub + "\"");
   }
 
   template <typename A = Actual,
             std::enable_if_t<std::is_convertible_v<A, std::string>, int> = 0>
   void toMatch(const char *sub) {
-    bool r = std::string(Value).find(sub) != std::string::npos;
-    if (r == Negated)
-      fail("toMatch", "\"" + std::string(sub) + "\"");
+    bool r = std::string(this->Value).find(sub) != std::string::npos;
+    if (r == this->Negated)
+      this->fail("toMatch", "\"" + std::string(sub) + "\"");
   }
 
   template <typename A = Actual,
@@ -296,45 +333,45 @@ public:
   void toMatch(const Regex &regex) {
     bool found = false;
     std::smatch matches;
-    if (std::regex_search(Value, matches, regex.Reg)) {
+    if (std::regex_search(this->Value, matches, regex.Reg)) {
       if (matches.size()) {
         found = true;
       }
     }
-    if (found == Negated)
-      fail("toMatch", "/" + regex.Pattern + "/");
+    if (found == this->Negated)
+      this->fail("toMatch", "/" + regex.Pattern + "/");
   }
 
   template <typename A = Actual,
             std::enable_if_t<std::is_convertible_v<A, std::string>, int> = 0>
   void toStartWith(const std::string &prefix) {
-    bool r = std::string(Value).rfind(prefix, 0) == 0;
-    if (r == Negated)
-      fail("toStartWith", detail::toStringSafe(prefix));
+    bool r = std::string(this->Value).rfind(prefix, 0) == 0;
+    if (r == this->Negated)
+      this->fail("toStartWith", detail::toStringSafe(prefix));
   }
 
   template <typename A = Actual,
             std::enable_if_t<std::is_convertible_v<A, std::string>, int> = 0>
   void toStartWith(const char *prefix) {
-    bool r = std::string(Value).rfind(prefix, 0) == 0;
-    if (r == Negated)
-      fail("toStartWith", detail::toStringSafe(prefix));
+    bool r = std::string(this->Value).rfind(prefix, 0) == 0;
+    if (r == this->Negated)
+      this->fail("toStartWith", detail::toStringSafe(prefix));
   }
 
   template <typename A = Actual,
             std::enable_if_t<std::is_convertible_v<A, std::string>, int> = 0>
   void toEndWith(const std::string &suffix) {
-    bool r = detail::endsWith(std::string(Value), suffix);
-    if (r == Negated)
-      fail("toEndWith", detail::toStringSafe(suffix));
+    bool r = detail::endsWith(std::string(this->Value), suffix);
+    if (r == this->Negated)
+      this->fail("toEndWith", detail::toStringSafe(suffix));
   }
 
   template <typename A = Actual,
             std::enable_if_t<std::is_convertible_v<A, std::string>, int> = 0>
   void toEndWith(const char *suffix) {
-    bool r = detail::endsWith(std::string(Value), suffix);
-    if (r == Negated)
-      fail("toEndWith", detail::toStringSafe(suffix));
+    bool r = detail::endsWith(std::string(this->Value), suffix);
+    if (r == this->Negated)
+      this->fail("toEndWith", detail::toStringSafe(suffix));
   }
 
   //
@@ -345,22 +382,22 @@ public:
             std::enable_if_t<detail::is_container_v<A>, int> = 0>
   void toContain(const Needle &needle) const {
     bool found = false;
-    for (const auto &actual : Value) {
+    for (const auto &actual : this->Value) {
       if (actual == needle) {
         found = true;
         break;
       }
     }
-    if (found == Negated)
-      fail("toContain", detail::toStringSafe(needle));
+    if (found == this->Negated)
+      this->fail("toContain", detail::toStringSafe(needle));
   }
 
   template <typename A = Actual,
             std::enable_if_t<detail::is_container_v<A>, int> = 0>
   void toHaveLength(const std::size_t &length) {
-    bool r = Value.size() == length;
-    if (r == Negated)
-      fail("toHaveLength", detail::toStringSafe(length));
+    bool r = this->Value.size() == length;
+    if (r == this->Negated)
+      this->fail("toHaveLength", detail::toStringSafe(length));
   }
 
   template <
@@ -370,36 +407,27 @@ public:
                        int> = 0>
   void toContainEqual(const Expected &expected) {
     bool found = false;
-    for (const auto &elem : Value) {
+    for (const auto &elem : this->Value) {
       if (deepEqual(elem, expected)) {
         found = true;
         break;
       }
     }
-    if (found == Negated)
-      fail("toContainEqual", detail::toStringSafe(expected));
+    if (found == this->Negated)
+      this->fail("toContainEqual", detail::toStringSafe(expected));
   }
 
   template <typename A = Actual,
             std::enable_if_t<detail::is_container_v<A>, int> = 0>
   void toBeEmpty() {
-    bool r = Value.empty();
+    bool r = this->Value.empty();
 
-    if (r == Negated)
-      fail("toBeEmpty", "size=" + detail::toStringSafe(Value.size()));
+    if (r == this->Negated)
+      this->fail("toBeEmpty",
+                 "size=" + detail::toStringSafe(this->Value.size()));
   }
 
 private:
-  Actual Value;
-  bool Negated;
-
-  void fail(const char *matcher, const std::string &expected_str) const {
-    std::ostringstream os;
-    os << "expect(" << detail::toStringSafe(Value) << ")"
-       << (Negated ? ".not." : ".") << matcher << "(" << expected_str << ")";
-    throw AssertionError(os.str());
-  }
-
   template <typename T, typename U>
   inline bool deepEqual(const T &a, const U &b) const {
     if constexpr (detail::is_container_v<T> && detail::is_container_v<U>) {
@@ -421,11 +449,12 @@ private:
     std::ostringstream os;
     os << detail::toStringSafe(expected);
 
-    auto itA = Value.begin();
+    auto itA = this->Value.begin();
     auto itE = expected.begin();
     std::size_t i = 0;
 
-    for (; itA != Value.end() && itE != expected.end(); ++itA, ++itE, ++i) {
+    for (; itA != this->Value.end() && itE != expected.end();
+         ++itA, ++itE, ++i) {
       if (!(*itA == *itE)) {
         os << " (first mismatch at index " << i << ": got "
            << detail::toStringSafe(*itA) << ", expected "
@@ -434,8 +463,8 @@ private:
       }
     }
 
-    if (Value.size() != expected.size()) {
-      os << " (size mismatch: got " << Value.size() << ", expected "
+    if (this->Value.size() != expected.size()) {
+      os << " (size mismatch: got " << this->Value.size() << ", expected "
          << expected.size() << ")";
     }
 
@@ -443,25 +472,21 @@ private:
   }
 };
 
-class ThrowingExpectation {
+class ThrowingExpectation : public AbsExpectation<Void, ThrowingExpectation> {
 public:
-  ThrowingExpectation(std::function<void()> function, bool negated = false)
-      : Function(function), Negated(negated) {}
-
-  ThrowingExpectation Not() const {
-    return ThrowingExpectation(Function, !Negated);
-  }
+  ThrowingExpectation(Void value, bool negated = false)
+      : AbsExpectation<Void, ThrowingExpectation>(value, negated) {}
 
   void toThrow() const {
     bool threw = false;
     try {
-      Function();
+      this->Value();
     } catch (...) {
       threw = true;
     }
-    if (threw == Negated) {
+    if (threw == this->Negated) {
       std::ostringstream os;
-      os << "expect(Function)" << (Negated ? ".not." : ".") << "toThrow()";
+      os << "expect(Value)" << (this->Negated ? ".not." : ".") << "toThrow()";
       throw AssertionError(os.str());
     }
   }
@@ -469,14 +494,14 @@ public:
   template <typename E> void toThrowType() const {
     bool ok = false;
     try {
-      Function();
+      this->Value();
     } catch (const E &) {
       ok = true;
     } catch (...) {
     }
-    if (ok == Negated) {
+    if (ok == this->Negated) {
       std::ostringstream os;
-      os << "expect(Function)" << (Negated ? ".not." : ".")
+      os << "expect(Value)" << (this->Negated ? ".not." : ".")
          << "toThrowType<E>()";
       throw AssertionError(os.str());
     }
@@ -486,31 +511,27 @@ public:
     bool ok = false;
     std::string message = "";
     try {
-      Function();
+      this->Value();
     } catch (const std::exception &e) {
       message = e.what();
       if (e.what() == expected)
         ok = true;
     }
-    if (ok == Negated) {
+    if (ok == this->Negated) {
       std::ostringstream os;
-      os << "expect to " << (Negated ? "not " : "") << "throw " << expected
-         << " but received " << message;
+      os << "expect to " << (this->Negated ? "not " : "") << "throw "
+         << expected << " but received " << message;
       throw AssertionError(os.str());
     }
   }
-
-private:
-  Void Function;
-  bool Negated;
 };
 
 template <typename T> Expectation<T> expect(T value) {
   return Expectation<T>(std::move(value));
 }
 
-inline ThrowingExpectation expect(Void function) {
-  return ThrowingExpectation(std::move(function));
+inline ThrowingExpectation expect(Void value) {
+  return ThrowingExpectation(std::move(value));
 }
 
 struct TestCase {
@@ -887,8 +908,37 @@ inline void afterEach(Void function) {
       CEST_CAT(cest_suite_reg_, __LINE__);                                     \
   }                                                                            \
   static void CEST_CAT(cest_suite_fn_, __LINE__)()
-
 } // namespace cest
+
+#define CEST_MATCHER(Name, Type, Predicate, Description)                       \
+  struct CEST_CAT(Tag_, Name) {};                                              \
+  namespace cest::detail {                                                     \
+  template <>                                                                  \
+  struct has_matcher<Type, CEST_CAT(Tag_, Name)> : std::true_type {};          \
+  }                                                                            \
+  namespace cest {                                                             \
+  class CEST_CAT(Expectation, Name) : public Expectation<Type> {               \
+  public:                                                                      \
+    CEST_CAT(Expectation, Name)(Type value, bool negated = false)              \
+        : Expectation<Type>(value, negated) {}                                 \
+                                                                               \
+    CEST_CAT(Expectation, Name) Not() const {                                  \
+      return CEST_CAT(Expectation, Name)(this->Value, !this->Negated);         \
+    }                                                                          \
+                                                                               \
+    void Name() const {                                                        \
+      auto pred = Predicate;                                                   \
+      bool r = pred(this->Value);                                              \
+      if (r == this->Negated)                                                  \
+        this->fail(#Name, Description);                                        \
+    }                                                                          \
+  };                                                                           \
+                                                                               \
+  template <detail::HasMatcher<CEST_CAT(Tag_, Name)> T>                        \
+  inline CEST_CAT(Expectation, Name) expect(T value) {                         \
+    return CEST_CAT(Expectation, Name)(std::move(value));                      \
+  }                                                                            \
+  }
 
 #ifdef CEST_MAIN
 int main() { return ::cest::Runner::instance().run(); }
