@@ -11,6 +11,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
+#include <cstring>
 #include <exception>
 #include <functional>
 #include <iostream>
@@ -162,13 +163,25 @@ public:
       : AbsExpectation<Actual, Expectation<Actual>>(value, negated) {}
 
   template <typename Expected> void toBe(const Expected &expected) const {
-    bool eq = (this->Value == expected);
+    bool eq;
+    if constexpr (std::is_floating_point_v<Actual> &&
+                  std::is_floating_point_v<Expected>) {
+      eq = (std::memcmp(&this->Value, &expected, sizeof(Actual)) == 0);
+    } else {
+      eq = (this->Value == expected);
+    }
     if (eq == this->Negated)
       this->fail("toBe", detail::toStringSafe(expected));
   }
 
   template <typename Expected> void toEqual(const Expected &expected) const {
-    bool eq = (this->Value == expected);
+    bool eq;
+    if constexpr (std::is_floating_point_v<Actual> &&
+                  std::is_floating_point_v<Expected>) {
+      eq = (std::memcmp(&this->Value, &expected, sizeof(Actual)) == 0);
+    } else {
+      eq = (this->Value == expected);
+    }
     if (eq == this->Negated)
       this->fail("toEqual", detail::toStringSafe(expected));
   }
