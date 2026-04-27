@@ -282,6 +282,70 @@ expect(std::vector<int>{1, 2, 3}).Not().toBeEmpty();
 expect(std::vector<int>{1, 2, 3}).Not().toHaveLength(1);
 ```
 
+### Partial object
+
+`toMatchObject(partial)` — passes if the actual object satisfies all field
+constraints declared in the `PartialType<T>` builder. Fields not mentioned in
+the matcher are ignored entirely.
+
+Use `PartialType<T>::field(ptr, value)` to declare each constraint. The first
+argument is a member pointer (`&T::field`), the second is the expected value.
+
+```cpp
+struct User {
+    std::string name;
+    int         age;
+    std::string email;
+};
+
+User user{"alice", 30, "alice@example.com"};
+
+// Only name and age are checked — email is ignored
+cest::expect(user).toMatchObject(
+    cest::PartialType{}
+        .field(&User::name, std::string("alice"))
+        .field(&User::age, 30));
+
+// Single field
+cest::expect(user).toMatchObject(
+    cest::PartialType{}.field(&User::age, 30));
+
+// Empty matcher — vacuously passes for any object
+cest::expect(user).toMatchObject(cest::PartialType{});
+```
+
+`.Not()` inverts the match — passes if **any** declared field fails to match:
+
+```cpp
+// Passes — age is 30, not 99
+cest::expect(user).Not().toMatchObject(
+    cest::PartialType{}.field(&User::age, 99));
+
+// Fails — all fields match, so .Not() throws
+cest::expect(cest::Void([&] {
+    cest::expect(user).Not().toMatchObject(
+        cest::PartialType{}.field(&User::age, 30));
+})).toThrow();
+```
+
+On failure, the error message includes the matcher name, the expected value,
+and the actual value of the mismatching field:
+
+```
+expect(<User>).toMatchObject( expected: 99
+ received: 30)
+```
+
+**Key semantics:**
+
+- Comparison is **asymmetric**: the actual object may have more fields than
+  the matcher declares — only declared fields are checked.
+- Fields are checked in declaration order; the first failure short-circuits
+  the rest.
+- Each field is compared with `operator==`.
+- Member pointers (`&T::field`) replace string names — no reflection required,
+  everything is resolved at compile time.
+
 ### Exceptions
 
 These matchers are available when `expect` receives a `cest::Void` (i.e. a
