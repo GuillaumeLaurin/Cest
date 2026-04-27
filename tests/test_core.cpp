@@ -893,3 +893,117 @@ TEST_SUITE("describe.skip — entire suite skipping") {
     });
   });
 }
+
+struct User {
+  std::string name;
+  int age;
+  std::string email;
+};
+
+TEST_SUITE("expect: toMatchObject") {
+  cest::describe("basic field matching", []() {
+    const User user{"alice", 30, "alice@example.com"};
+
+    cest::it("passes when all specified fields match", [user]() {
+      cest::expect(user).toMatchObject(
+          cest::PartialType<User>{}
+              .field(&User::name, std::string("alice"))
+              .field(&User::age, 30));
+    });
+
+    cest::it("passes when only one field is specified and matches", [user]() {
+      cest::expect(user).toMatchObject(
+          cest::PartialType<User>{}.field(&User::age, 30));
+    });
+
+    cest::it("ignores fields not specified in the matcher", [user]() {
+      // email is not checked — only name matters here
+      cest::expect(user).toMatchObject(
+          cest::PartialType<User>{}.field(&User::name, std::string("alice")));
+    });
+
+    cest::it("fails when a specified field does not match", [user]() {
+      EXPECT_THROWS(cest::expect(user).toMatchObject(
+          cest::PartialType<User>{}.field(&User::age, 99)));
+    });
+
+    cest::it("fails when the first field matches but a later one does not",
+             [user]() {
+               EXPECT_THROWS(cest::expect(user).toMatchObject(
+                   cest::PartialType<User>{}
+                       .field(&User::name, std::string("alice"))
+                       .field(&User::age, 99)));
+             });
+  });
+
+  cest::describe(".Not()", []() {
+    const User user{"alice", 30, "alice@example.com"};
+
+    cest::it(".Not() passes when a field does not match", [user]() {
+      cest::expect(user).Not().toMatchObject(
+          cest::PartialType<User>{}.field(&User::age, 99));
+    });
+
+    cest::it(".Not() fails when all specified fields match", [user]() {
+      EXPECT_THROWS(cest::expect(user).Not().toMatchObject(
+          cest::PartialType<User>{}.field(&User::age, 30)));
+    });
+  });
+
+  cest::describe("error message content", []() {
+    const User user{"alice", 30, "alice@example.com"};
+
+    cest::it("error message contains expected and received values on mismatch",
+             [user]() {
+               bool caught = false;
+               try {
+                 cest::expect(user).toMatchObject(
+                     cest::PartialType<User>{}.field(&User::age, 99));
+               } catch (const cest::AssertionError &e) {
+                 caught = true;
+                 const std::string msg = e.what();
+                 cest::expect(msg).toMatch("99"); // expected
+                 cest::expect(msg).toMatch("30"); // received
+               }
+               cest::expect(caught).toBeTruthy();
+             });
+
+    cest::it("error message contains toMatchObject", [user]() {
+      bool caught = false;
+      try {
+        cest::expect(user).toMatchObject(
+            cest::PartialType<User>{}.field(&User::age, 99));
+      } catch (const cest::AssertionError &e) {
+        caught = true;
+        cest::expect(std::string(e.what())).toMatch("toMatchObject");
+      }
+      cest::expect(caught).toBeTruthy();
+    });
+
+    cest::it(".not. appears in negated assertion message", [user]() {
+      bool caught = false;
+      try {
+        cest::expect(user).Not().toMatchObject(
+            cest::PartialType<User>{}.field(&User::age, 30));
+      } catch (const cest::AssertionError &e) {
+        caught = true;
+        cest::expect(std::string(e.what())).toMatch("not");
+      }
+      cest::expect(caught).toBeTruthy();
+    });
+  });
+
+  cest::describe("empty matcher", []() {
+    const User user{"alice", 30, "alice@example.com"};
+
+    cest::it("passes with zero fields specified", [user]() {
+      cest::expect(user).toMatchObject(cest::PartialType<User>{});
+    });
+
+    cest::it(".Not() fails with zero fields specified (vacuously matches)",
+             [user]() {
+               EXPECT_THROWS(cest::expect(user).Not().toMatchObject(
+                   cest::PartialType<User>{}));
+             });
+  });
+}
