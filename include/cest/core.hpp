@@ -6,7 +6,6 @@
  * @file include/core.hpp
  * This is the core of the Cest testing library.
  */
-
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -15,6 +14,7 @@
 #include <exception>
 #include <functional>
 #include <iostream>
+#include <optional>
 #include <regex>
 #include <sstream>
 #include <string>
@@ -134,6 +134,37 @@ template <typename T> std::string toStringSafe(const T &v) {
 }
 
 } // namespace detail
+
+template <typename T> class PartialType {
+  struct FieldCheck {
+    std::function<bool(const T &)> predicate;
+    std::function<std::string(const T &)> describe;
+  };
+
+public:
+  template <typename FieldType>
+  PartialType &field(FieldType T::*ptr, FieldType value) {
+    Checks.push_back({[ptr, value](const T &obj) { return obj.*ptr == value; },
+                      [ptr, value](const T &obj) {
+                        std::ostringstream os;
+                        os << " expected: " << value << "\n"
+                           << " received: " << obj.*ptr;
+                        return os.str();
+                      }});
+    return *this;
+  }
+
+  std::optional<std::string> firstFailure(const T &obj) const {
+    for (auto &check : Checks) {
+      if (!check.predicate(obj))
+        return check.describe(obj);
+    }
+    return std::nullopt;
+  }
+
+private:
+  std::vector<FieldCheck> Checks;
+};
 
 template <typename Actual, typename Derived> class AbsExpectation {
 public:
@@ -425,6 +456,17 @@ public:
     if (r == this->Negated)
       this->fail("toBeEmpty",
                  "size=" + detail::toStringSafe(this->Value.size()));
+  }
+
+  //
+  // Partial Object Matchers
+  //
+
+  void toMatchObject(const PartialType<Actual> &partial) const {
+    auto failure = partial.firstFailure(this->Value);
+    bool res = !failure.has_value();
+    if (res == this->Negated)
+      this->fail("toMatchObject", failure.value_or(""));
   }
 
 private:
