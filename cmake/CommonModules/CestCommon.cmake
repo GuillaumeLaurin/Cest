@@ -147,12 +147,16 @@ endfunction()
 function(cest_mock_common mock_target mock_strict_target)
 
   if(MSVC)
-    target_compile_options(${mock_target} INTERFACE /guard:cf-)
-    target_link_options(${mock_target} INTERFACE /guard:cf- /INCREMENTAL:NO)
-    target_compile_options(${mock_target} INTERFACE /Ob0)
+    foreach(facet IN ITEMS ${mock_target} ${mock_strict_target})
+      target_compile_options(${facet} INTERFACE /guard:cf-)
+      target_link_options(${facet}    INTERFACE /guard:cf- /INCREMENTAL:NO)
+    endforeach()
 
-    target_compile_options(${mock_strict_target} INTERFACE /guard:cf-)
-    target_link_options(${mock_strict_target} INTERFACE /guard:cf- /INCREMENTAL:NO)
+    target_compile_options(${mock_target} INTERFACE /Ob0)
+  else()
+    target_compile_definitions(${mock_target} INTERFACE
+      -fno-inline -fno-inline-functions
+    )
   endif()
   
 endfunction()

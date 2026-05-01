@@ -47,12 +47,18 @@ else()
   set(cest_map_debug Debug Debug RelWithDebInfo Release MinSizeRel)
 endif()
 
-set_target_properties(@Cest_ns@::@Cest_target@ PROPERTIES
-  MAP_IMPORTED_CONFIG_RELEASE "${cest_map_release}"
-  MAP_IMPORTED_CONFIG_RELWITHDEBINFO "${cest_map_relwithdebinfo}"
-  MAP_IMPORTED_CONFIG_MINSIZEREL "${cest_map_minsizerel}"
-  MAP_IMPORTED_CONFIG_DEBUG "${cest_map_debug}"
-)
+foreach(cest_facet IN ITEMS @Cest_target@ Mock MockStrict)
+  if(TARGET @Cest_ns@::${cest_facet})
+    set_target_properties(@Cest_ns@::${cest_facet} PROPERTIES
+      MAP_IMPORTED_CONFIG_RELEASE        "${cest_map_release}"
+      MAP_IMPORTED_CONFIG_RELWITHDEBINFO "${cest_map_relwithdebinfo}"
+      MAP_IMPORTED_CONFIG_MINSIZEREL     "${cest_map_minsizerel}"
+      MAP_IMPORTED_CONFIG_DEBUG          "${cest_map_debug}"
+    )
+  endif()
+endforeach()
+
+unset(cest_facet)
 
 message(DEBUG "Setting CMAKE_MAP_IMPORTED_CONFIG_<CONFIG> for the \
         @Cest_ns@::@Cest_target@ target to avoid link a release type builds against \

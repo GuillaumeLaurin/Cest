@@ -141,8 +141,7 @@ target_sources(${MockStrict_target} INTERFACE
 )
 
 # ---
-include(CestCommon)
-cest_mock_common(${Mock_target} ${MockStrict_target})
+
 
 # ---
 
@@ -205,6 +204,8 @@ cest_common(${CommonConfig_target}
   NAMESPACE ${Cest_ns}
   EXPORT NAME ${CommonConfig_target}
 )
+
+cest_mock_common(${Mock_target} ${MockStrict_target})
 
 if(STRICT_MODE)
   target_link_libraries(${Cest_target}

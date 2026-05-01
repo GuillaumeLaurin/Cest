@@ -12,7 +12,11 @@ function(cest_install_cest)
   message(STATUS "CEST_BUILD_INSTALLTREEDIR = ${CEST_BUILD_INSTALLTREEDIR}")
   message(STATUS "Full path = ${PROJECT_BINARY_DIR}/${CEST_BUILD_INSTALLTREEDIR}/usage") 
   install(
-    TARGETS ${Cest_target} ${CommonConfig_target}
+    TARGETS 
+      ${Cest_target} 
+      ${Mock_target} 
+      ${MockStrict_target} 
+      ${CommonConfig_target}
     EXPORT CestTargets
     FILE_SET HEADERS DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
   )
