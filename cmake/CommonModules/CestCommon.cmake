@@ -143,3 +143,16 @@ function(cest_common target)
   endif()
 
 endfunction()
+
+function(cest_mock_common mock_target mock_strict_target)
+
+  if(MSVC)
+    target_compile_options(${mock_target} INTERFACE /guard:cf-)
+    target_link_options(${mock_target} INTERFACE /guard:cf- /INCREMENTAL:NO)
+    target_compile_options(${mock_target} INTERFACE /Ob0)
+
+    target_compile_options(${mock_strict_target} INTERFACE /guard:cf-)
+    target_link_options(${mock_strict_target} INTERFACE /guard:cf- /INCREMENTAL:NO)
+  endif()
+  
+endfunction()

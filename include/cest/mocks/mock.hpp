@@ -12,7 +12,7 @@
  *  * MockFn records every call, supports mockReturnValue / mockImplementation /
  *    mockReturnValueOnce, and exposes Jest-style matchers via expect().
  */
-#include "core.hpp"
+#include "cest/core.hpp"
 
 #include <deque>
 #include <functional>
