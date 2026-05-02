@@ -537,13 +537,13 @@ Rules that `cest` enforces, matching Jest:
 - A throwing hook is reported inline and marks the affected test as failed.
 
 ## Mocking
-
-There are two paths — they solve two different problems.
-
+ 
+There are three paths — they solve different problems and trade portability for power.
+ 
 ### Tier A: `MockFn<Sig>` via dependency injection (fully portable)
-
+ 
 No inheritance, no vtable, zero-cost in production. Parameterize your code by a dependency type and inject a `MockFn` in tests.
-
+ 
 ```cpp
 template <typename Sender>
 class Notifier {
@@ -552,43 +552,105 @@ public:
     explicit Notifier(Sender sender) : Value(std::move(sender)) {}
     void notify(std::string user, std::string msg) { Value(user, msg); }
 };
-
+ 
 // In a test:
 MockFn<void(std::string, std::string)> sender;
 Notifier<decltype(sender)> n(sender);
 n.notify("alice", "hi");
-
+ 
 expect(sender).toHaveBeenCalledTimes(1);
 expect(sender).toHaveBeenCalledWith(std::string("alice"), std::string("hi"));
 ```
-
+ 
 Jest-style API available: `mockReturnValue`, `mockReturnValueOnce` (queue), `mockImplementation`, `mockClear`, `mockReset`, `calls()`, `callCount()`. Matchers: `toHaveBeenCalled`, `toHaveBeenCalledTimes`, `toHaveBeenCalledWith`. Mock copies share the call history (internal `shared_ptr`), so passing the mock by value to your system-under-test works as expected.
-
-### Tier B: `hotpatch()` — runtime interception (Linux/macOS, x86_64 + ARM64)
-
+ 
+This tier ships in the `Cest::Cest` (core) target — no extra link required.
+ 
+### Tier B: `hotpatch()` — runtime interception
+ 
 For cases where you **cannot** modify the calling code: free functions from a third-party library, existing non-virtual methods that you do not want to templatize. Rewrites the first instructions of the target function with a jump to your replacement, and restores on guard destruction.
-
+ 
+Supported on Linux, macOS, and Windows, on x86_64 and ARM64.
+ 
 ```cpp
-int real_multiply(int a, int b) { return a * b; }  // must be noinline!
+int real_multiply(int a, int b) { return a * b; }
 int fake_multiply(int, int) { return 999; }
-
+ 
 {
     auto guard = hotpatch(&real_multiply, &fake_multiply);
     real_multiply(6, 7);  // -> 999
 }
 real_multiply(6, 7);      // -> 42 (restored)
 ```
-
-**Caveats to know about:**
-
-- The target function **must** be non-inlined. Compile with `-O0 -fno-inline`, or mark it `__attribute__((noinline))`, or put it in a separate TU built without optimization.
-- Does not work on Windows in this build. Windows support is on the roadmap but not implemented; the hotpatch module is **not part of the CI test surface** yet.
-- Not thread-safe during the patch itself.
-- No "call original" from the replacement: this is a replace-and-restore, not a full detour trampoline.
-
-## Why two tiers?
-
-The original design goal was "cross-platform" + "mock everything (even non-virtual)" + "no inheritance". These three constraints cannot all be satisfied *cleanly* at the same time. Tier A covers 95 % of real unit-testing needs with zero compromise. Tier B catches the remaining 5 % on platforms where hot-patching is reasonable, and fails explicitly elsewhere with a message telling you to use Tier A instead.
+ 
+Hot-patching has hard requirements that conflict with several modern compiler defaults (Control Flow Guard, Incremental Linking, function inlining). To keep the user from having to discover and apply each flag manually, the library exposes two CMake facets: `Cest::Mock` and `Cest::MockStrict`.
+ 
+#### `Cest::Mock` — recommended default
+ 
+Link `Cest::Mock` and you get hot-patching that just works. No annotations on your functions are required.
+ 
+```cmake
+find_package(Cest REQUIRED)
+add_executable(my_tests test_main.cpp)
+target_link_libraries(my_tests PRIVATE Cest::Mock)
+```
+ 
+Linking `Cest::Mock` propagates these flags to the consumer:
+ 
+- `/guard:cf-` and `/GUARD:NO` (MSVC) — disable Control Flow Guard.
+- `/INCREMENTAL:NO` (MSVC) — disable incremental linking, which would otherwise place a thunk before each function and break the patch.
+- `/Ob0` (MSVC) or `-fno-inline -fno-inline-functions` (GCC/Clang) — disable inlining globally so that any function can be hot-patched without explicit annotation.
+ 
+Trade-off: the test binary loses inlining, so it's a less optimized build than production. For a unit-test binary this is almost always acceptable.
+ 
+> **Note (MSVC):** when `STRICT_MODE` is on, MSVC will emit warning D9025 ("overriding `/guard:cf` with `/guard:cf-`") at compile time. This is intentional — Control Flow Guard must be disabled for hot-patching to work. The warning is cosmetic and does not fail the build. `D9025` is a command-line driver warning and cannot be suppressed via `/wd9025`.
+ 
+#### `Cest::MockStrict` — fine-grained control
+ 
+Link `Cest::MockStrict` if you want to keep inlining enabled in your test binary (e.g. for performance-sensitive integration tests). In exchange, **every function you intend to hot-patch must be annotated** with `CEST_MOCKABLE` (which expands to `__declspec(noinline)` on MSVC and `__attribute__((noinline))` elsewhere).
+ 
+```cpp
+#include <cest/macros/attributes.hpp>
+ 
+CEST_MOCKABLE int real_multiply(int a, int b) { return a * b; }
+ 
+// In test:
+auto guard = hotpatch(&real_multiply, &fake_multiply);
+```
+ 
+`Cest::MockStrict` propagates the same Control Flow Guard and incremental linking flags as `Cest::Mock`, but does **not** disable inlining globally.
+ 
+#### `hotpatchMethod()` — non-virtual member functions
+ 
+For non-virtual methods, use the `hotpatchMethod` overload. The replacement is a free function whose first parameter is the class pointer (the implicit `this`):
+ 
+```cpp
+struct Calculator {
+    int compute(int x) { return x * 10; }
+};
+ 
+int mockCompute(Calculator*, int) { return -1; }
+ 
+Calculator c;
+auto guard = hotpatchMethod(&Calculator::compute, &mockCompute);
+c.compute(5);  // -> -1
+```
+ 
+A const-qualified overload is provided for `const` methods. The replacement's first parameter must then be `const Class*`.
+ 
+#### Caveats to know about
+ 
+- **Affects all instances.** `hotpatchMethod` patches the function code, which is shared across all instances of the class. Per-instance mocking of virtual methods is on the roadmap (vtable swap).
+- **Not for virtual methods.** Use `hotpatchMethod` only for non-virtual methods. Virtual dispatch goes through the vtable, which `hotpatch` does not touch.
+- **Multiple/virtual inheritance under MSVC.** `hotpatchMethod` extracts the function address from a member pointer via `memcpy`. Under MSVC, this is reliable only for single-inheritance classes. Classes with multiple or virtual inheritance use a larger member-pointer representation.
+- **Not thread-safe during the patch itself.** Apply patches in single-threaded test setup, not concurrently.
+- **No "call original" from the replacement.** This is replace-and-restore, not a full detour trampoline.
+- **Build configuration:** when building Cest from source rather than via `find_package`, set `-DSTRICT_MODE=OFF` if you don't want the test binaries themselves to inherit `/guard:cf` from `CommonConfig`.
+ 
+### Why three tiers?
+ 
+The original design goal was "cross-platform" + "mock everything (even non-virtual)" + "no inheritance". These three constraints cannot all be satisfied *cleanly* at the same time. Tier A (`Cest::Mock`) covers 95% of real unit-testing needs with zero compromise. Tier B (`Cest::Mock`) catches the remaining 5% with zero annotation cost in exchange for losing inlining. Tier C (`Cest::MockStrict`) gives you the same hot-patching power while keeping your test binary fully optimized, at the cost of one annotation per hot-patchable function.
+````
 
 ## Build
 
