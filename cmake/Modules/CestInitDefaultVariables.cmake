@@ -141,6 +141,8 @@ macro(cest_init_cest_variables_pre)
   set(CommonConfig_target CommonConfig)
   set(Cest_target Cest)
   set(CestUtils_target CestUtils)
+  set(Mock_target Mock)
+  set(MockStrict_target MockStrict)
 
   string(TOLOWER "${CMAKE_BUILD_TYPE}" CEST_BUILD_TYPE_LOWER)
   string(TOUPPER "${CMAKE_BUILD_TYPE}" CEST_BUILD_TYPE_UPPER)

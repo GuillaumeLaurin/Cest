@@ -7,6 +7,7 @@ A pragmatic plan for turning Cest from a working Jest-style test library into so
 - 🟢 **Small** — Small effort.
 - 🟡 **Medium** — Medium effort.
 - 🔴 **Large** — Enormous effort.
+- ✅ **Done** — Implemented and shipped.
 
 ---
 
@@ -24,16 +25,9 @@ Shuffle test and hook order to surface hidden ordering dependencies, the way Jes
 
 **Implementation notes.** `std::shuffle` with `std::mt19937` seeded from `std::random_device` (or the CLI flag). Shuffling happens in `Runner::run()` just before `runSuite` is first called — walk the tree once and shuffle in place on mutable copies.
 
-### 1.2 🟢 `it.skip` / `it.only` and `describe.skip` / `describe.only`
+### 1.2 ✅ `it.skip` / `it.only` and `describe.skip` / `describe.only`
 
-Jest-style focus and skip. Essential for iterating on a single failing test without commenting out the rest of the file.
-
-- `it.skip("name", []{...})` — registers the test but marks it skipped; reported as `○ name (skipped)` in yellow.
-- `it.only("name", []{...})` — if *any* `only` exists in the run, *only* those tests (and their ancestor hooks) execute. Everything else is reported as skipped.
-- Same for `describe.skip` / `describe.only`.
-- C++ syntax note: `it.skip` is not directly possible (dot on a free function) — expose as a struct with overloaded `operator()` plus `.skip` / `.only` members, so the call site reads `it("name", ...)`, `it.skip("name", ...)`, `it.only("name", ...)`. Same trick for `describe`.
-
-**Implementation notes.** Add `bool skipped` and `bool focused` to `TestCase` and `Suite`. Two-pass runner: first pass collects whether any `.only` exists anywhere in the tree; second pass executes, skipping anything not focused if the flag is set.
+> **Done.** Shipped via #3 (`it.skip` / `describe.skip`) and #4 (`it.only` / `describe.only`). See the README sections "Skipping tests and suites" and "Focusing tests and suites" for the user-facing docs.
 
 ### 1.3 🟡 CLI filtering by name
 
@@ -56,73 +50,55 @@ Run only tests matching a pattern — the single most-used feature in any seriou
 
 ## 2. Matchers
 
-### 2.1 🟡 Full Jest matcher parity
+### 2.1 ✅ Full Jest matcher parity
 
-Current set is the minimum viable. Jest users expect these without thinking. Prioritize the ones people reach for daily:
+> **Done.** Shipped across multiple PRs:
+>
+> - **Equality and identity**: `toStrictEqual` (#6), `toMatchObject` (#7).
+> - **Numbers**: `toBeCloseTo`, `toBeNaN`, `toBeFinite`, `toBeInfinite`, `toBeGreaterThanOrEqual`, `toBeLessThanOrEqual` (#8).
+> - **Strings**: `toMatch`, `toStartWith`, `toEndWith` (#9).
+> - **Containers**: `toHaveLength` (#10), `toContainEqual`, `toBeEmpty` (#11).
+> - **Exceptions**: `toThrowMessage` (#12); `toThrowType<E>()` was already present and is now documented.
+>
+> All new matchers compose with `.Not()`. See the README "Matchers" section for the full reference.
 
-**Equality and identity**
-- `toStrictEqual` — deep equality that also checks types (for containers and aggregates)
-- `toMatchObject` — partial object match against a struct with designated initializers or a `std::map`-like subset
+### 2.2 ✅ Custom matchers
 
-**Numbers**
-- `toBeCloseTo(value, precision)` — floating-point comparison with configurable precision
-- `toBeNaN`, `toBeFinite`, `toBeInfinite`
-- `toBeGreaterThanOrEqual`, `toBeLessThanOrEqual`
-
-**Strings**
-- `toMatch(regex_or_substring)` — regex or substring match
-- `toStartWith`, `toEndWith`
-- `toHaveLength(n)` — also works on containers
-
-**Containers**
-- `toHaveLength(n)`
-- `toContainEqual` — like `toContain` but uses deep equality instead of `==`
-- `toBeEmpty`
-
-**Exceptions**
-- `toThrowType<E>()` — already present, document it
-- `toThrowMessage("substring")` — catches any exception derived from `std::exception` and matches against `what()`
-
-**Negation**
-- Make sure every new matcher composes with `.Not()`.
-
-**Implementation notes for `toMatchObject`.** The tricky one. C++ has no reflection, so "partial object match" needs a helper type — probably a `PartialMatch` builder:
-```cpp
-expect(user).toMatchObject(PartialMatch{}
-    .field("name", std::string("alice"))
-    .field("age", 30));
-```
-Less ergonomic than JS but honest about the language. Alternatively, for types the user controls, a `CEST_REFLECT(Type, field1, field2, ...)` macro that generates a comparator — more setup, much better syntax.
-
-### 2.2 🟢 Custom matchers
-
-Let users register their own matchers once and reuse them across the codebase.
-
-```cpp
-CEST_MATCHER(toBeEven, int, [](int n) {
-    return n % 2 == 0;
-}, "even number");
-```
-
-Minimal surface: a macro that generates a free function returning a matcher object, hooked into the `Expectation` template via ADL or a trait.
+> **Done.** Shipped via #13. Users can register their own matchers with the `CEST_MATCHER(Name, Type, Predicate, Description)` macro. See the README "Custom matchers" section.
 
 ---
 
 ## 3. Mocking enhancements
 
-### 3.1 🔴 Hot-patch on Windows
+### 3.1 ✅ Hot-patch on Windows
 
-Currently the POSIX-only path throws an explicit error on Windows. Making it work requires:
+> **Done.** Windows is now a first-class target for `cest::hotpatch`, alongside Linux and macOS, on both x86_64 and ARM64. The implementation:
+>
+> - Uses `VirtualProtect` (`PAGE_EXECUTE_READWRITE` during the patch, restored to `PAGE_EXECUTE_READ` after).
+> - Reuses the same x86_64 (`movabs rax, imm64; jmp rax`) and AArch64 (`ldr x16, #8; br x16; <addr>`) encodings as the POSIX path.
+> - Calls `FlushInstructionCache(GetCurrentProcess(), addr, size)` unconditionally on Windows.
+> - Documents and enforces the build-time requirements (`/INCREMENTAL:NO`, `/guard:cf-` / `/GUARD:NO`, inlining control) via the new `Cest::Mock` and `Cest::MockStrict` CMake facets — users get the right flags automatically by linking the appropriate target.
+>
+> Two facets are exported so users can choose their trade-off:
+>
+> - `Cest::Mock` — disables inlining globally (`/Ob0` / `-fno-inline`) so no annotations are required on hot-patchable functions.
+> - `Cest::MockStrict` — keeps inlining; users must annotate hot-patchable functions with `CEST_MOCKABLE`.
+>
+> A `hotpatchMethod()` overload was also added for non-virtual member functions. See the README "Tier B: `hotpatch()`" section for the full user-facing docs.
 
-- **Memory protection.** Replace `mprotect` with `VirtualProtect` (`PAGE_EXECUTE_READWRITE` during the patch, restore to `PAGE_EXECUTE_READ` after).
-- **Instruction encoding.** x86_64 encoding is identical to Linux (`movabs rax, imm64; jmp rax`), so the 12-byte sequence in `hotpatch.hpp` ports directly. ARM64 Windows uses the same AArch64 encoding as Linux — no change needed.
-- **Incremental Linking (`/INCREMENTAL`).** MSVC Debug builds insert a jump thunk at every function entry (`jmp target`) so the linker can patch functions in place. You end up patching the *thunk*, not the real function — which actually still works, but the semantics are subtler. Recommend building tests with `/INCREMENTAL:NO` and document it loudly.
-- **ASLR and `/guard:cf`.** Control Flow Guard rejects jumps to non-registered targets. Document how to disable for test builds (`/guard:cf-`).
-- **I-cache flush.** `FlushInstructionCache(GetCurrentProcess(), addr, size)` — there's no coherent-x86 shortcut; call it unconditionally on Windows.
+### 3.2 🟢 Per-instance mocking of virtual methods (`VTableGuard`)
 
-**Don't pretend it's cross-platform until it's tested on Windows.** Set up CI with `windows-latest` + MSVC and run the hot-patch test before claiming support.
+Hot-patching today rewrites function code, which is shared across all instances of a class. For virtual methods, that's the wrong granularity — most tests want to swap behavior on a single instance without affecting siblings.
 
-### 3.2 🟡 Spy on existing callables
+- `VTableGuard::forInstance(instance, &Class::method, &replacement)` — copies the original vtable into a heap buffer, modifies one slot in the copy, and points the instance's vptr at the copy. Other instances are unaffected. Restores the vptr on guard destruction.
+- `VTableGuard::forClass(any_instance, &Class::method, &replacement)` — modifies the actual class vtable in place. Affects all instances. Use sparingly; useful for global stubs.
+- Slot index extraction works automatically on Itanium ABI (Linux, macOS — GCC and Clang). On MSVC, the slot index must be passed explicitly via `forInstanceSlot(instance, slot, replacement)` because MSVC's pointer-to-virtual-member is a generated thunk, not an encoded index.
+
+**Caveats to document:** the guard must outlive the instance (otherwise the vptr points into freed memory); single-vptr layout is assumed (multiple inheritance with multiple sub-objects requires adjusting the instance pointer to the right sub-object); the swapped vtable is a copy, so RTTI on the patched instance still returns the original `type_info`.
+
+**Implementation notes.** This is a separate tool from `hotpatch` — it doesn't touch executable memory at all, just data. No `VirtualProtect` / `mprotect` needed for the per-instance variant; the class-wide variant does need write access to the vtable section.
+
+### 3.3 🟡 Spy on existing callables
 
 `MockFn` today is a standalone mock. Add a `spyOn` equivalent that wraps an existing `std::function` or lambda, forwards calls to it, *and* records them.
 
@@ -135,7 +111,7 @@ expect(spied).toHaveBeenCalledWith(1, 2);
 
 Useful when the production code passes you a functor and you just want to observe it without reimplementing behavior.
 
-### 3.3 🟢 Call-order assertions across mocks
+### 3.4 🟢 Call-order assertions across mocks
 
 Jest has `mock.calls` per mock but lacks cross-mock ordering out of the box. Add a global call log (opt-in) so users can assert "`sendEmail` was called before `logAudit`".
 
@@ -246,11 +222,12 @@ Today the macro uses `__LINE__` to avoid symbol collisions. It works but produce
 
 ## Ordering
 
-1. **1.3 CLI filtering** and **1.2 skip/only** — you'll want these the moment the test suite grows past a few dozen cases.
+With the matcher parity (#2.1), focus/skip (#1.2), custom matchers (#2.2), and Windows hot-patch (#3.1) all done, the next priorities are:
+
+1. **1.3 CLI filtering** — once the suite has a few dozen tests it becomes painful to run only one. The skip/focus plumbing from 1.2 already exists; filtering is a thin layer on top.
 2. **4.1 JUnit reporter** (plus **4.2 timing** as a prerequisite) — unlocks CI integration.
 3. **5.0 Code coverage** — pairs naturally with the JUnit reporter; same CI run produces both artifacts. Do it right after 4.1 while you're still in "CI wiring" mode.
-4. **2.1 Matcher parity** — incremental, can be done one matcher at a time between other work.
+4. **3.2 VTable-based mocking** — small effort, completes the mocking story for virtual methods. Natural follow-up to the hot-patch work.
 5. **1.1 Randomization** — valuable but can wait until the suite is big enough that ordering bugs become plausible.
-6. **3.1 Windows hot-patch** — highest effort, lowest urgency unless you actually need it. Tier A (`MockFn`) covers most real cases.
-7. **3.2 / 3.3 Mock enhancements** — nice to have, rarely blocking.
-8. **6.x Ergonomics** — polish, do last.
+6. **3.3 / 3.4 Mock enhancements** — nice to have, rarely blocking.
+7. **6.x Ergonomics** — polish, do last.

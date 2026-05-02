@@ -98,6 +98,17 @@ cest_check_unsupported_build()
 add_library(${Cest_target} INTERFACE)
 add_library(${Cest_ns}::${Cest_target} ALIAS ${Cest_target})
 
+add_library(${Mock_target} INTERFACE)
+add_library(${Cest_ns}::${Mock_target} ALIAS ${Mock_target})
+
+add_library(${MockStrict_target} INTERFACE)
+add_library(${Cest_ns}::${MockStrict_target} ALIAS ${MockStrict_target})
+
+# ---
+
+target_link_libraries(${Mock_target} INTERFACE ${Cest_ns}::${Cest_target})
+target_link_libraries(${MockStrict_target} INTERFACE ${Cest_ns}::${Cest_target})
+
 # ---
 
 feature_option(CEST_EXAMPLE
@@ -113,6 +124,32 @@ target_sources(${Cest_target} INTERFACE
   FILE_SET HEADERS
   BASE_DIRS ${PROJECT_SOURCE_DIR}/include
   FILES ${${Cest_target}_headers}
+)
+
+cest_sources_mock(${Mock_target}_headers)
+
+target_sources(${Mock_target} INTERFACE
+  FILE_SET HEADERS
+  BASE_DIRS ${PROJECT_SOURCE_DIR}/include
+  FILES ${${Mock_target}_headers}
+)
+
+target_sources(${MockStrict_target} INTERFACE
+  FILE_SET HEADERS
+  BASE_DIRS ${PROJECT_SOURCE_DIR}/include
+  FILES ${${Mock_target}_headers}
+)
+
+# ---
+
+
+# ---
+
+target_include_directories(${Mock_target}
+  INTERFACE "$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>"
+)
+target_include_directories(${MockStrict_target}
+  INTERFACE "$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>"
 )
 
 # ---
@@ -167,6 +204,8 @@ cest_common(${CommonConfig_target}
   NAMESPACE ${Cest_ns}
   EXPORT NAME ${CommonConfig_target}
 )
+
+cest_mock_common(${Mock_target} ${MockStrict_target})
 
 if(STRICT_MODE)
   target_link_libraries(${Cest_target}

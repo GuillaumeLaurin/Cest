@@ -1,15 +1,10 @@
 #ifndef VERSION_HPP
 #define VERSION_HPP
 
-#ifndef RC_INVOKED
-#include "cest/macros/system_header.hpp"
-CEST_SYSTEM_HEADER
-#endif
-
 #include "cest/macros/stringify.hpp"
 
 #define CEST_VERSION_MAJOR 0
-#define CEST_VERSION_MINOR 8
+#define CEST_VERSION_MINOR 9
 #define CEST_VERSION_BUGFIX 0
 #define CEST_VERSION_BUILD 0
 

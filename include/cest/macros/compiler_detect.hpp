@@ -1,9 +1,6 @@
 #ifndef COMPILER_DETECT_HPP
 #define COMPILER_DETECT_HPP
 
-#include "cest/macros/system_header.hpp"
-CEST_SYSTEM_HEADER
-
 // Used compiler
 // Must be before GNU, because clang claims to be GNU too
 #ifdef __clang__

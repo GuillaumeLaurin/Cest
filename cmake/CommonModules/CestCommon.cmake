@@ -122,6 +122,13 @@ function(cest_common target)
       -pipe
     )
 
+    # GCC 12+ has aggressive false positives for -Wmaybe-uninitialized when
+    # std::function copies lambdas (notably in expect(Void(...)) patterns).
+    if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU"
+       AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL "12")
+      target_compile_options(${target} INTERFACE -Wno-maybe-uninitialized)
+    endif()
+
     include(CheckCXXCompilerFlag)
     check_cxx_compiler_flag(-Wstrict-null-sentinel SNS_SUPPORT)
 
@@ -142,4 +149,21 @@ function(cest_common target)
     target_compile_definitions(${target} INTERFACE -D_FILE_OFFSET_BITS=64)
   endif()
 
+endfunction()
+
+function(cest_mock_common mock_target mock_strict_target)
+
+  if(MSVC)
+    foreach(facet IN ITEMS ${mock_target} ${mock_strict_target})
+      target_compile_options(${facet} INTERFACE /guard:cf-)
+      target_link_options(${facet}    INTERFACE /GUARD:NO /INCREMENTAL:NO)
+    endforeach()
+
+    target_compile_options(${mock_target} INTERFACE /Ob0)
+  else()
+    target_compile_options(${mock_target} INTERFACE
+      -fno-inline -fno-inline-functions
+    )
+  endif()
+  
 endfunction()

@@ -1,16 +1,38 @@
+# tests/CMakeLists.txt
+
 add_executable(cest_tests
     main.cpp
     test_core.cpp
-    test_mock.cpp
     test_custom.cpp
 )
 target_link_libraries(cest_tests PRIVATE Cest::Cest)
-target_compile_features(cest_tests PRIVATE cxx_std_20)
 
-# To test .only
-add_executable(cest_test_focus test_focus.cpp)
-target_link_libraries(cest_test_focus PRIVATE Cest::Cest)
-target_compile_features(cest_test_focus PRIVATE cxx_std_20)
+add_executable(cest_focus_tests test_focus.cpp)
+target_link_libraries(cest_focus_tests PRIVATE Cest::Cest)
 
-add_test(NAME cest_tests COMMAND cest_tests)
-add_test(NAME cest_test_focus COMMAND cest_test_focus)
+add_executable(cest_mock_tests test_mock.cpp)
+target_link_libraries(cest_mock_tests PRIVATE Cest::Mock)
+
+# Hot-patch tests are only built and run where hot-patching actually works.
+# - macOS: blocked by W^X enforcement on the __TEXT segment.
+# - Release builds: optimizer can bypass patches (constant propagation,
+#   IPA cloning) even with CEST_MOCKABLE on MSVC (no equivalent of GCC's
+#   noipa available).
+if(NOT APPLE)
+  add_executable(cest_hotpatch_tests test_hotpatch.cpp)
+  target_link_libraries(cest_hotpatch_tests PRIVATE Cest::Mock)
+
+  add_executable(cest_strict_hotpatch_tests test_strict_hotpatch.cpp)
+  target_link_libraries(cest_strict_hotpatch_tests PRIVATE Cest::MockStrict)
+
+  add_test(NAME cest_hotpatch_tests
+           COMMAND cest_hotpatch_tests
+           CONFIGURATIONS Debug)
+  add_test(NAME cest_strict_hotpatch_tests
+           COMMAND cest_strict_hotpatch_tests
+           CONFIGURATIONS Debug)
+endif()
+
+add_test(NAME cest_tests        COMMAND cest_tests)
+add_test(NAME cest_focus_tests  COMMAND cest_focus_tests)
+add_test(NAME cest_mock_tests   COMMAND cest_mock_tests)
