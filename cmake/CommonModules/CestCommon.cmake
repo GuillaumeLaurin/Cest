@@ -154,7 +154,7 @@ function(cest_mock_common mock_target mock_strict_target)
 
     target_compile_options(${mock_target} INTERFACE /Ob0)
   else()
-    target_compile_definitions(${mock_target} INTERFACE
+    target_compile_options(${mock_target} INTERFACE
       -fno-inline -fno-inline-functions
     )
   endif()
