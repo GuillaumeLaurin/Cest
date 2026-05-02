@@ -112,6 +112,18 @@ template <typename F> inline void withRwx(void *addr, size_t len, F &&fn) {
   uintptr_t start = reinterpret_cast<uintptr_t>(addr) & ~(ps - 1);
   uintptr_t end =
       (reinterpret_cast<uintptr_t>(addr) + len + ps - 1) & ~(ps - 1);
+
+#if defined(__APPLE__)
+  // macOS enforces W^X strictly: cannot have WRITE + EXEC simultaneously.
+  // Toggle: drop EXEC, add WRITE -> modify -> drop WRITE, restore EXEC.
+  if (::mprotect(reinterpret_cast<void *>(start), end - start,
+                 PROT_READ | PROT_WRITE) != 0) {
+    throw std::runtime_error("cest::hotpatch: mprotect RW failed");
+  }
+  fn();
+  ::mprotect(reinterpret_cast<void *>(start), end - start,
+             PROT_READ | PROT_EXEC);
+#else
   if (::mprotect(reinterpret_cast<void *>(start), end - start,
                  PROT_READ | PROT_WRITE | PROT_EXEC) != 0) {
     throw std::runtime_error("cest::hotpatch: mprotect RWX failed");
@@ -119,6 +131,7 @@ template <typename F> inline void withRwx(void *addr, size_t len, F &&fn) {
   fn();
   ::mprotect(reinterpret_cast<void *>(start), end - start,
              PROT_READ | PROT_EXEC);
+#endif
 }
 
 #if defined(__x86_64__) || defined(_M_X64)

@@ -2,7 +2,7 @@
 #define ATTRIBUTES_HPP
 
 #if defined(_MSC_VER)
-#define CEST_NOINLINE __declspec(noinline)
+#define CEST_NOINLINE __declspec((noinline, noipa))
 #elif defined(__GNUC__) || defined(__clang__)
 #define CEST_NOINLINE __attribute__((noinline))
 #else
