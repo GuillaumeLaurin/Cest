@@ -1,4 +1,6 @@
-#include "cest/mock.hpp"
+#define CEST_MAIN
+#include <cest.hpp>
+#include <mocks.hpp>
 
 TEST_SUITE("MockFn: basic calls") {
   cest::describe("callCount / wasCalled / wasCalledTimes", []() {

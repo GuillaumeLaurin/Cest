@@ -149,7 +149,7 @@ function(cest_mock_common mock_target mock_strict_target)
   if(MSVC)
     foreach(facet IN ITEMS ${mock_target} ${mock_strict_target})
       target_compile_options(${facet} INTERFACE /guard:cf-)
-      target_link_options(${facet}    INTERFACE /guard:cf- /INCREMENTAL:NO)
+      target_link_options(${facet}    INTERFACE /GUARD:NO /INCREMENTAL:NO)
     endforeach()
 
     target_compile_options(${mock_target} INTERFACE /Ob0)

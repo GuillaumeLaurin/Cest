@@ -30,6 +30,7 @@ function(cest_sources_mock out_headers)
     cest/macros/attributes.hpp
     cest/mocks/mock.hpp
     cest/mocks/hot_patch.hpp
+    cest/mocks/hot_patch_method.hpp
     mocks.hpp
   )
 
