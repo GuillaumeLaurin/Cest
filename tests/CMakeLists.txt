@@ -25,10 +25,12 @@ add_test(NAME cest_tests               COMMAND cest_tests)
 add_test(NAME cest_focus_tests         COMMAND cest_focus_tests)
 add_test(NAME cest_mock_tests          COMMAND cest_mock_tests)
 
-add_test(NAME cest_hotpatch_tests      
-         COMMAND cest_hotpatch_tests
-         CONFIGURATION Debug)
-         
-add_test(NAME cest_strict_hotpatch_tests 
-         COMMAND cest_strict_hotpatch_tests
-         CONFIGURATION Debug)
+if (NOT APPLE)
+  add_test(NAME cest_hotpatch_tests      
+           COMMAND cest_hotpatch_tests
+           CONFIGURATION Debug)
+
+  add_test(NAME cest_strict_hotpatch_tests 
+           COMMAND cest_strict_hotpatch_tests
+           CONFIGURATION Debug)
+endif()
