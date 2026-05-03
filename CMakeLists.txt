@@ -95,6 +95,10 @@ cest_check_unsupported_build()
 
 # ---
 
+cest_find_package(tabulate CONFIG REQUIRED)
+
+# ---
+
 add_library(${Cest_target} INTERFACE)
 add_library(${Cest_ns}::${Cest_target} ALIAS ${Cest_target})
 
@@ -106,8 +110,20 @@ add_library(${Cest_ns}::${MockStrict_target} ALIAS ${MockStrict_target})
 
 # ---
 
-target_link_libraries(${Mock_target} INTERFACE ${Cest_ns}::${Cest_target})
-target_link_libraries(${MockStrict_target} INTERFACE ${Cest_ns}::${Cest_target})
+target_link_libraries(${Cest_target} 
+  INTERFACE 
+    tabulate::tabulate
+)
+
+target_link_libraries(${Mock_target} 
+  INTERFACE 
+    ${Cest_ns}::${Cest_target}
+)
+
+target_link_libraries(${MockStrict_target} 
+  INTERFACE 
+    ${Cest_ns}::${Cest_target}
+)
 
 # ---
 

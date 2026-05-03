@@ -440,3 +440,15 @@ function(cest_generate_target_includes out_variable)
   set(${out_variable} ${result} PARENT_SCOPE)
 
 endfunction()
+
+macro(set_packages_properties)
+
+  set_package_properties(tabulate
+    PROPERTIES
+      URL "https://github.com/p-ranav/tabulate"
+      DESCRIPTION "Table Maker for Modern C++"
+      TYPE REQUIRED
+      PURPOSE "Used by Console reporter"
+  )
+
+endmacro()
