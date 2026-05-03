@@ -6,8 +6,13 @@ function(cest_sources out_headers)
   list(APPEND headers
     cest/macros/stringify.hpp
     cest/macros/compiler_detect.hpp
+    cest/utils/math.hpp
+    cest/utils/suite.hpp
+    cest/utils/test_case.hpp
+    cest/utils/colors.hpp
     cest/core.hpp
-    cest/math.hpp
+    cest/types.hpp
+    cest/type_traits.hpp
     cest.hpp
     version.hpp
   )

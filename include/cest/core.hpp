@@ -6,6 +6,16 @@
  * @file include/core.hpp
  * This is the core of the Cest testing library.
  */
+#include "cest/type_traits.hpp"
+
+#include "cest/types.hpp"
+
+#include "cest/utils/suite.hpp"
+
+#include "cest/utils/test_case.hpp"
+
+#include "cest/utils/colors.hpp"
+
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -27,37 +37,7 @@
 
 namespace cest {
 
-using Void = std::function<void()>;
-
-struct Regex {
-  Regex(const std::string &pattern) : Pattern(pattern), Reg(pattern) {}
-
-  std::string Pattern;
-  std::regex Reg;
-};
-
 namespace detail {
-inline bool colorEnabled() {
-  static const bool v = []() {
-#if defined(_WIN32) || defined(_WIN64)
-    char *val = nullptr;
-    size_t len = 0;
-    bool no_color = (_dupenv_s(&val, &len, "NO_COLOR") == 9 && val != nullptr);
-    free(val);
-    return !no_color;
-#else
-    return std::getenv("NO_COLOR") == nullptr;
-#endif // defined(_WIN32) || defined(_WIN64)
-  }();
-  return v;
-}
-
-inline const char *red() { return colorEnabled() ? "\033[31m" : ""; }
-inline const char *green() { return colorEnabled() ? "\033[32m" : ""; }
-inline const char *gray() { return colorEnabled() ? "\033[90m" : ""; }
-inline const char *yellow() { return colorEnabled() ? "\033[33m" : ""; }
-inline const char *bold() { return colorEnabled() ? "\033[1m" : ""; }
-inline const char *reset() { return colorEnabled() ? "\033[0m" : ""; }
 
 inline bool endsWith(const std::string &str, const std::string &suffix) {
   if (str.length() < suffix.length())
@@ -75,38 +55,12 @@ struct AssertionError : std::runtime_error {
 };
 
 namespace detail {
-template <typename T, typename = void>
-struct is_streamable : std::false_type {};
-
-template <typename T>
-struct is_streamable<T, std::void_t<decltype(std::declval<std::ostream &>()
-                                             << std::declval<const T &>())>>
-    : std::true_type {};
-
-template <typename T, typename = void> struct is_container : std::false_type {};
-
-template <typename T>
-struct is_container<T, std::void_t<typename T::value_type, typename T::iterator,
-                                   decltype(std::declval<T>().begin()),
-                                   decltype(std::declval<T>().end()),
-                                   decltype(std::declval<T>().size())>>
-    : std::true_type {};
-
-template <typename T>
-inline constexpr bool is_container_v = is_container<T>::value;
-
-template <typename T, typename MatcherTag>
-struct has_matcher : std::false_type {};
-
-template <typename T, typename MatcherTag>
-concept HasMatcher = has_matcher<T, MatcherTag>::value;
-
 /**
  * @brief Converts safely a type T to string if the type is streamable
  * @returns a string
  */
 template <typename T> std::string toStringSafe(const T &v) {
-  if constexpr (detail::is_container_v<T> && !std::is_same_v<T, std::string>) {
+  if constexpr (is_container_v<T> && !std::is_same_v<T, std::string>) {
     std::string result = "[";
     auto iter = v.begin();
     while (iter != v.end()) {
@@ -230,7 +184,7 @@ public:
       bool eq = deepEqual(this->Value, expected);
 
       if (eq == this->Negated) {
-        if constexpr (detail::is_container_v<A> && detail::is_container_v<E>) {
+        if constexpr (is_container_v<A> && is_container_v<E>) {
           this->fail("toStrictEqual", containerDiff(expected));
         } else {
           this->fail("toStrictEqual", detail::toStringSafe(expected));
@@ -410,7 +364,7 @@ public:
   //
 
   template <typename Needle, typename A = Actual,
-            std::enable_if_t<detail::is_container_v<A>, int> = 0>
+            std::enable_if_t<is_container_v<A>, int> = 0>
   void toContain(const Needle &needle) const {
     bool found = false;
     for (const auto &actual : this->Value) {
@@ -423,8 +377,7 @@ public:
       this->fail("toContain", detail::toStringSafe(needle));
   }
 
-  template <typename A = Actual,
-            std::enable_if_t<detail::is_container_v<A>, int> = 0>
+  template <typename A = Actual, std::enable_if_t<is_container_v<A>, int> = 0>
   void toHaveLength(const std::size_t &length) {
     bool r = this->Value.size() == length;
     if (r == this->Negated)
@@ -433,7 +386,7 @@ public:
 
   template <
       typename Expected, typename A = Actual,
-      std::enable_if_t<detail::is_container_v<A>, int> = 0,
+      std::enable_if_t<is_container_v<A>, int> = 0,
       std::enable_if_t<std::is_convertible_v<Expected, typename A::value_type>,
                        int> = 0>
   void toContainEqual(const Expected &expected) {
@@ -448,8 +401,7 @@ public:
       this->fail("toContainEqual", detail::toStringSafe(expected));
   }
 
-  template <typename A = Actual,
-            std::enable_if_t<detail::is_container_v<A>, int> = 0>
+  template <typename A = Actual, std::enable_if_t<is_container_v<A>, int> = 0>
   void toBeEmpty() {
     bool r = this->Value.empty();
 
@@ -472,7 +424,7 @@ public:
 private:
   template <typename T, typename U>
   inline bool deepEqual(const T &a, const U &b) const {
-    if constexpr (detail::is_container_v<T> && detail::is_container_v<U>) {
+    if constexpr (is_container_v<T> && is_container_v<U>) {
       if (a.size() != b.size())
         return false;
       auto itA = a.begin();
@@ -576,26 +528,6 @@ inline ThrowingExpectation expect(Void value) {
   return ThrowingExpectation(std::move(value));
 }
 
-struct TestCase {
-  std::string Name;
-  Void Function;
-  bool Skipped = false;
-  bool Focussed = false;
-};
-
-struct Suite {
-  std::string Name;
-  std::vector<TestCase> Tests;
-  std::vector<Suite> Children;
-  std::vector<Void> BeforeAll;
-  std::vector<Void> AfterAll;
-  std::vector<Void> BeforeEach;
-  std::vector<Void> AfterEach;
-  bool Skipped = false;
-  bool Focussed = false;
-  bool HasFocussedDescendant = false;
-};
-
 class Runner {
 public:
   static Runner &instance() {
@@ -604,7 +536,7 @@ public:
   }
 
   void beginDescribe(const std::string &name) {
-    Suite s;
+    utils::Suite s;
     s.Name = name;
     s.Skipped = currentSuite().Skipped;
     Stack.push_back(std::move(s));
@@ -615,7 +547,7 @@ public:
   void focusSuite() { currentSuite().Focussed = true; }
 
   void endDescribe() {
-    Suite s = std::move(Stack.back());
+    utils::Suite s = std::move(Stack.back());
     Stack.pop_back();
     currentSuite().Children.push_back(std::move(s));
   }
@@ -656,25 +588,25 @@ public:
     dryRun(Root);
     if (HasFocus) {
       std::cout << "\n"
-                << detail::bold() << detail::yellow() << "Focus mode activated"
-                << detail::reset() << "\n"
-                << detail::yellow() << "Don't forget to turn it off"
-                << detail::reset() << "\n";
+                << utils::bold() << utils::yellow() << "Focus mode activated"
+                << utils::reset() << "\n"
+                << utils::yellow() << "Don't forget to turn it off"
+                << utils::reset() << "\n";
     }
     runSuite(Root, 0, {}, {});
     std::cout << "\n"
-              << detail::bold() << "Results: " << detail::green() << Passed
-              << " passed" << detail::reset() << ", "
-              << (Failed ? detail::red() : detail::gray()) << Failed
-              << " failed" << detail::reset() << ", "
-              << (Skipped ? detail::yellow() : detail::gray()) << Skipped
-              << " skipped" << detail::reset() << "\n";
+              << utils::bold() << "Results: " << utils::green() << Passed
+              << " passed" << utils::reset() << ", "
+              << (Failed ? utils::red() : utils::gray()) << Failed << " failed"
+              << utils::reset() << ", "
+              << (Skipped ? utils::yellow() : utils::gray()) << Skipped
+              << " skipped" << utils::reset() << "\n";
     return Failed == 0 ? 0 : 1;
   }
 
 private:
-  Suite Root;
-  std::vector<Suite> Stack;
+  utils::Suite Root;
+  std::vector<utils::Suite> Stack;
   int Passed = 0, Failed = 0, Skipped = 0;
   bool HasFocus = false;
 
@@ -684,7 +616,7 @@ private:
 #endif
   }
 
-  Suite &currentSuite() { return Stack.empty() ? Root : Stack.back(); }
+  utils::Suite &currentSuite() { return Stack.empty() ? Root : Stack.back(); }
 
   using HookList = std::vector<Void>;
 
@@ -694,7 +626,7 @@ private:
     }
   }
 
-  void runSuite(const Suite &s, int depth, HookList inheritedBeforeEach,
+  void runSuite(const utils::Suite &s, int depth, HookList inheritedBeforeEach,
                 HookList inheritedAfterEach) {
     if (HasFocus && !s.Focussed && !s.HasFocussedDescendant) {
       return;
@@ -702,10 +634,10 @@ private:
     if (!s.Name.empty()) {
       indent(depth);
       if (s.Skipped) {
-        std::cout << detail::bold() << detail::yellow() << s.Name
-                  << detail::reset() << "\n";
+        std::cout << utils::bold() << utils::yellow() << s.Name
+                  << utils::reset() << "\n";
       } else {
-        std::cout << detail::bold() << s.Name << detail::reset() << "\n";
+        std::cout << utils::bold() << s.Name << utils::reset() << "\n";
       }
     }
 
@@ -717,8 +649,8 @@ private:
           h();
         } catch (const std::exception &e) {
           indent(d);
-          std::cout << detail::red() << "beforeAll threw: " << e.what()
-                    << detail::reset() << "\n";
+          std::cout << utils::red() << "beforeAll threw: " << e.what()
+                    << utils::reset() << "\n";
         }
       }
     }
@@ -788,18 +720,18 @@ private:
       }
 
       if (t.Skipped) {
-        std::cout << detail::yellow() << "Skipped " << t.Name << detail::reset()
+        std::cout << utils::yellow() << "Skipped " << t.Name << utils::reset()
                   << "\n";
         ++Skipped;
       } else if (ok) {
-        std::cout << detail::green() << "\xE2\x9C\x93 " << detail::reset()
+        std::cout << utils::green() << "\xE2\x9C\x93 " << utils::reset()
                   << t.Name << "\n";
         ++Passed;
       } else {
-        std::cout << detail::red() << "\xE2\x9C\x97 " << t.Name
-                  << detail::reset() << "\n";
+        std::cout << utils::red() << "\xE2\x9C\x97 " << t.Name << utils::reset()
+                  << "\n";
         indent(d + 1);
-        std::cout << detail::red() << errMsg << detail::reset() << "\n";
+        std::cout << utils::red() << errMsg << utils::reset() << "\n";
         ++Failed;
         (void)assertionErr;
       }
@@ -830,14 +762,14 @@ private:
           h();
         } catch (const std::exception &e) {
           indent(d);
-          std::cout << detail::red() << "afterAll threw: " << e.what()
-                    << detail::reset() << "\n";
+          std::cout << utils::red() << "afterAll threw: " << e.what()
+                    << utils::reset() << "\n";
         }
       }
     }
   }
 
-  void dryRun(Suite &s) {
+  void dryRun(utils::Suite &s) {
     if (s.Focussed) {
       HasFocus = true;
     }
@@ -976,7 +908,7 @@ inline void afterEach(Void function) {
     }                                                                          \
   };                                                                           \
                                                                                \
-  template <detail::HasMatcher<CEST_CAT(Tag_, Name)> T>                        \
+  template <HasMatcher<CEST_CAT(Tag_, Name)> T>                                \
   inline CEST_CAT(Expectation, Name) expect(T value) {                         \
     return CEST_CAT(Expectation, Name)(std::move(value));                      \
   }                                                                            \
