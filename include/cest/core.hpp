@@ -541,21 +541,10 @@ public:
     return r;
   }
 
-  /**
-   * @brief Add a reporter that will receive run events. Multiple reporters
-   *        can be active simultaneously — they are called in registration
-   *        order.
-   *
-   * If no reporter is added, run() automatically installs a
-   * ConsoleReporter so existing user code keeps working.
-   */
   void addReporter(std::shared_ptr<reporters::IReporter> reporter) {
     Reporters.push_back(std::move(reporter));
   }
 
-  /**
-   * @brief Remove all registered reporters.
-   */
   void clearReporters() { Reporters.clear(); }
 
   void beginDescribe(const std::string &name) {
@@ -575,35 +564,42 @@ public:
     currentSuite().Children.push_back(std::move(s));
   }
 
-  /**
-   * @brief Called by the TEST_SUITE() macro before invoking the user's body.
-   *        Records where new top-level suites are about to land so we can
-   *        wrap them on endTestSuiteFile().
-   */
   void beginTestSuiteFile(const std::string &file) {
     TestSuiteFileStack.push_back(file);
     TestSuiteRootMarkers.push_back(Root.Children.size());
   }
 
-  /**
-   * @brief Called by the TEST_SUITE() macro after the user's body has run.
-   *        Wraps every suite that was just appended to Root into a single
-   *        synthetic Suite (IsTestSuiteRoot=true, File set), so reporters
-   *        can render one PASS/FAIL banner per file.
-   */
   void endTestSuiteFile() {
     std::size_t startIdx = TestSuiteRootMarkers.back();
     TestSuiteRootMarkers.pop_back();
     std::string file = TestSuiteFileStack.back();
     TestSuiteFileStack.pop_back();
 
+    utils::Suite *existing = nullptr;
+    for (std::size_t i = 0; i < startIdx; ++i) {
+      if (Root.Children[i].IsTestSuiteRoot && Root.Children[i].File == file) {
+        existing = &Root.Children[i];
+        break;
+      }
+    }
+
+    if (existing != nullptr) {
+      for (std::size_t i = startIdx; i < Root.Children.size(); ++i) {
+        existing->Children.push_back(std::move(Root.Children[i]));
+        if (existing->Children.back().Focussed ||
+            existing->Children.back().HasFocussedDescendant) {
+          existing->HasFocussedDescendant = true;
+        }
+      }
+      Root.Children.resize(startIdx);
+      return;
+    }
+
     utils::Suite wrapper;
     wrapper.File = std::move(file);
     wrapper.IsTestSuiteRoot = true;
     for (std::size_t i = startIdx; i < Root.Children.size(); ++i) {
       wrapper.Children.push_back(std::move(Root.Children[i]));
-      // Propagate skip/focus from the children up so that focus detection
-      // continues to work at the wrapper level.
       if (wrapper.Children.back().Focussed ||
           wrapper.Children.back().HasFocussedDescendant) {
         wrapper.HasFocussedDescendant = true;

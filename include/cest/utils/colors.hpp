@@ -34,7 +34,7 @@ inline const char *gray() { return colorEnabled() ? "\033[90m" : ""; }
 inline const char *black() { return colorEnabled() ? "\033[30m" : ""; }
 inline const char *white() { return colorEnabled() ? "\033[37m" : ""; }
 
-// Background colors (used by Jest-style PASS/FAIL banners)
+// Background colors
 inline const char *bgGreen() { return colorEnabled() ? "\033[42m" : ""; }
 inline const char *bgRed() { return colorEnabled() ? "\033[41m" : ""; }
 inline const char *bgYellow() { return colorEnabled() ? "\033[43m" : ""; }

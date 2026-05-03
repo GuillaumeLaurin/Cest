@@ -12,6 +12,7 @@
 #include <chrono>
 #include <iomanip>
 #include <iostream>
+#include <memory>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -24,34 +25,18 @@ namespace cest {
 
 namespace reporters {
 
-/**
- * @brief Console reporter that mimics Jest's output as closely as possible.
- *
- * Layout per file:
- *
- *   PASS  ./path/to/file.cpp
- *     <suite name>
- *       ✓ test 1 (3 ms)
- *       ✓ test 2
- *       ✗ failing test
- *       ○ skipped test
- *
- * Plus a final aggregated summary block:
- *
- *   Test Suites: 1 passed, 1 total
- *   Tests:       4 passed, 4 total
- *   Snapshots:   0 total
- *   Time:        0.436 s
- *   Ran all test suites.
- */
 class ConsoleReporter : public IReporter {
 public:
   /**
-   * @param useTable If true, the final summary block is rendered as a tabulate
-   *                 table with borders. Otherwise it uses Jest's plain
-   *                 column-aligned format.
+   * @param useTable    If true, the final summary block is rendered as a
+   *                    tabulate table with borders. Otherwise it uses Jest's
+   *                    plain column-aligned format.
+   * @param autoCompact If true (default), when more than one test file ran
+   *                    we omit passing tests from the per-file detail. Set
+   *                    to false to always show every test.
    */
-  explicit ConsoleReporter(bool useTable = false) : UseTable(useTable) {}
+  explicit ConsoleReporter(bool useTable = false, bool autoCompact = true)
+      : UseTable(useTable), AutoCompact(autoCompact) {}
 
   ~ConsoleReporter() override = default;
 
@@ -65,103 +50,103 @@ public:
   void onRunStart(uint64_t /*seed*/, bool /*passed*/) override {
     StartTime = std::chrono::steady_clock::now();
     FilesPassed = FilesFailed = 0;
+    Files.clear();
+    Failures.clear();
+    HookErrors.clear();
   }
 
-  void onSuiteStart(const utils::Suite &suite, int depth) override {
+  void onSuiteStart(const utils::Suite &suite, int /*depth*/) override {
     if (suite.IsTestSuiteRoot) {
-      // Start buffering output for this file.
-      Buffer.str("");
-      Buffer.clear();
-      CurrentFile = suite.File;
-      CurrentFileFailed = 0;
-      CurrentFilePassed = 0;
-      CurrentFileSkipped = 0;
+      Files.emplace_back();
+      Files.back().Path = suite.File;
+      NodeStack.clear();
+      NodeStack.push_back(&Files.back().Tree);
       InTestSuiteFile = true;
-      DescribeDepth = 0;
       return;
     }
 
-    if (!suite.Name.empty()) {
-      // The test-suite-root wrapper is transparent, so its children are
-      // displayed at depth 0 (one indent past the banner).
-      indent(out(), DescribeDepth + 1);
-      if (suite.Skipped) {
-        out() << utils::bold() << utils::yellow() << suite.Name
-              << utils::reset() << "\n";
-      } else {
-        out() << utils::bold() << suite.Name << utils::reset() << "\n";
-      }
-      ++DescribeDepth;
-      ++NamedDescribeOpen;
-    }
-    (void)depth;
+    if (!InTestSuiteFile)
+      return;
+
+    auto child = std::make_unique<Node>();
+    child->Kind = NodeKind::Describe;
+    child->Name = suite.Name;
+    child->Skipped = suite.Skipped;
+    Node *raw = child.get();
+    NodeStack.back()->Children.push_back(std::move(child));
+    NodeStack.push_back(raw);
   }
 
   void onSuiteEnd(const utils::Suite &suite, int /*depth*/) override {
     if (suite.IsTestSuiteRoot) {
-      // Print the PASS/FAIL banner first, then flush the buffered detail.
-      bool failed = CurrentFileFailed > 0;
-      if (failed) {
-        std::cout << utils::bold() << utils::black() << utils::bgRed()
-                  << " FAIL " << utils::reset() << " " << utils::bold()
-                  << CurrentFile << utils::reset() << "\n";
-        ++FilesFailed;
-      } else {
-        std::cout << utils::bold() << utils::black() << utils::bgGreen()
-                  << " PASS " << utils::reset() << " " << utils::bold()
-                  << CurrentFile << utils::reset() << "\n";
-        ++FilesPassed;
-      }
-      std::cout << Buffer.str();
-
       InTestSuiteFile = false;
-      DescribeDepth = 0;
+      NodeStack.clear();
+      bool fileFailed =
+          Files.back().FailedCount > 0 || Files.back().HookErrorCount > 0;
+      if (fileFailed)
+        ++FilesFailed;
+      else
+        ++FilesPassed;
       return;
     }
 
-    if (!suite.Name.empty()) {
-      --DescribeDepth;
-      --NamedDescribeOpen;
-    }
+    if (!InTestSuiteFile)
+      return;
+
+    if (NodeStack.size() > 1)
+      NodeStack.pop_back();
   }
 
   void onTestPass(const utils::TestCase &test,
                   std::chrono::nanoseconds duration) override {
-    indent(out(), DescribeDepth + 1);
-    out() << utils::green() << "\xE2\x9C\x93 " << utils::reset() << test.Name;
-    appendDuration(out(), duration);
-    out() << "\n";
-    ++CurrentFilePassed;
+    if (!InTestSuiteFile)
+      return;
+    auto leaf = std::make_unique<Node>();
+    leaf->Kind = NodeKind::TestPass;
+    leaf->Name = test.Name;
+    leaf->Duration = duration;
+    NodeStack.back()->Children.push_back(std::move(leaf));
+    ++Files.back().PassedCount;
   }
 
   void onTestFail(const utils::TestCase &test, const std::string &err,
                   std::chrono::nanoseconds duration) override {
-    indent(out(), DescribeDepth + 1);
-    out() << utils::red() << "\xE2\x9C\x97 " << utils::reset() << test.Name;
-    appendDuration(out(), duration);
-    out() << "\n";
-    indent(out(), DescribeDepth + 2);
-    out() << utils::red() << err << utils::reset() << "\n";
+    if (!InTestSuiteFile)
+      return;
+    auto leaf = std::make_unique<Node>();
+    leaf->Kind = NodeKind::TestFail;
+    leaf->Name = test.Name;
+    leaf->Message = err;
+    leaf->Duration = duration;
+    NodeStack.back()->Children.push_back(std::move(leaf));
+    ++Files.back().FailedCount;
 
-    Failures.push_back({CurrentFile, test.Name, err});
-    ++CurrentFileFailed;
+    Failures.push_back({Files.back().Path, test.Name, err});
   }
 
   void onTestSkip(const utils::TestCase &test) override {
-    indent(out(), DescribeDepth + 1);
-    out() << utils::yellow() << "\xE2\x97\x8B " << utils::reset()
-          << utils::gray() << "skipped " << test.Name << utils::reset() << "\n";
-    ++CurrentFileSkipped;
+    if (!InTestSuiteFile)
+      return;
+    auto leaf = std::make_unique<Node>();
+    leaf->Kind = NodeKind::TestSkip;
+    leaf->Name = test.Name;
+    NodeStack.back()->Children.push_back(std::move(leaf));
+    ++Files.back().SkippedCount;
   }
 
   void onHookError(const utils::Suite &suite, const std::string &hookName,
                    const std::string &message) override {
-    indent(out(), DescribeDepth + 1);
-    out() << utils::red() << hookName << " threw"
-          << (suite.Name.empty() ? "" : " in \"" + suite.Name + "\"") << ": "
-          << message << utils::reset() << "\n";
-    HookErrors.push_back({CurrentFile, suite.Name, hookName, message});
-    ++CurrentFileFailed; // Treat hook errors as failures for the banner.
+    if (!InTestSuiteFile)
+      return;
+    auto leaf = std::make_unique<Node>();
+    leaf->Kind = NodeKind::HookError;
+    leaf->Name = hookName;
+    leaf->Message = message;
+    leaf->SuiteName = suite.Name;
+    NodeStack.back()->Children.push_back(std::move(leaf));
+    ++Files.back().HookErrorCount;
+
+    HookErrors.push_back({Files.back().Path, suite.Name, hookName, message});
   }
 
   void onRunEnd(int passed, int failed, int skipped) override {
@@ -170,7 +155,20 @@ public:
         std::chrono::duration_cast<std::chrono::milliseconds>(end - StartTime)
             .count();
 
-    // Failure recap (Jest-style "● Test Name" header per failure).
+    bool compact = AutoCompact && Files.size() > 1;
+
+    for (const auto &file : Files) {
+      printBanner(file);
+
+      if (compact && file.FailedCount == 0 && file.SkippedCount == 0 &&
+          file.HookErrorCount == 0) {
+        continue;
+      }
+      for (const auto &child : file.Tree.Children) {
+        renderNode(*child, /*depth=*/0, compact);
+      }
+    }
+
     if (!Failures.empty() || !HookErrors.empty()) {
       std::cout << "\n"
                 << utils::bold() << "Summary of all failing tests"
@@ -205,6 +203,27 @@ public:
   }
 
 private:
+  enum class NodeKind { Describe, TestPass, TestFail, TestSkip, HookError };
+
+  struct Node {
+    NodeKind Kind = NodeKind::Describe;
+    std::string Name;
+    std::string Message;
+    std::string SuiteName;
+    std::chrono::nanoseconds Duration{0};
+    bool Skipped = false;
+    std::vector<std::unique_ptr<Node>> Children;
+  };
+
+  struct FileRecord {
+    std::string Path;
+    Node Tree;
+    int PassedCount = 0;
+    int FailedCount = 0;
+    int SkippedCount = 0;
+    int HookErrorCount = 0;
+  };
+
   struct FailureRecord {
     std::string File;
     std::string TestName;
@@ -219,42 +238,109 @@ private:
   };
 
   bool UseTable = false;
+  bool AutoCompact = true;
 
-  // Buffered output for the current file (so PASS/FAIL banner can be
-  // printed *before* the details).
-  std::ostringstream Buffer;
+  std::vector<FileRecord> Files;
+  std::vector<Node *> NodeStack;
   bool InTestSuiteFile = false;
-  std::string CurrentFile;
-  int CurrentFilePassed = 0;
-  int CurrentFileFailed = 0;
-  int CurrentFileSkipped = 0;
 
-  // Aggregate stats.
   int FilesPassed = 0;
   int FilesFailed = 0;
   std::chrono::steady_clock::time_point StartTime;
+
   std::vector<FailureRecord> Failures;
   std::vector<HookErrorRecord> HookErrors;
-
-  // Tracks how deep into named describe() blocks we currently are *within*
-  // a TEST_SUITE wrapper. Incremented in onSuiteStart, decremented in
-  // onSuiteEnd. Reset whenever we enter a new IsTestSuiteRoot wrapper.
-  int DescribeDepth = 0;
-  int NamedDescribeOpen = 0;
-
-  std::ostream &out() { return InTestSuiteFile ? Buffer : std::cout; }
 
   static void indent(std::ostream &os, int n) {
     for (int i = 0; i < n; ++i)
       os << "  ";
   }
 
+  static bool subtreeHasNonPass(const Node &n) {
+    if (n.Kind == NodeKind::TestFail || n.Kind == NodeKind::TestSkip ||
+        n.Kind == NodeKind::HookError)
+      return true;
+    for (const auto &c : n.Children) {
+      if (subtreeHasNonPass(*c))
+        return true;
+    }
+    return false;
+  }
+
+  void renderNode(const Node &n, int depth, bool compact) const {
+    switch (n.Kind) {
+    case NodeKind::Describe: {
+
+      if (compact && !subtreeHasNonPass(n))
+        return;
+
+      if (!n.Name.empty()) {
+        indent(std::cout, depth + 1);
+        if (n.Skipped) {
+          std::cout << utils::bold() << utils::yellow() << n.Name
+                    << utils::reset() << "\n";
+        } else {
+          std::cout << utils::bold() << n.Name << utils::reset() << "\n";
+        }
+      }
+      int childDepth = n.Name.empty() ? depth : depth + 1;
+      for (const auto &c : n.Children)
+        renderNode(*c, childDepth, compact);
+      break;
+    }
+    case NodeKind::TestPass: {
+      if (compact)
+        return;
+      indent(std::cout, depth + 1);
+      std::cout << utils::green() << "\xE2\x9C\x93 " << utils::reset()
+                << n.Name;
+      appendDuration(std::cout, n.Duration);
+      std::cout << "\n";
+      break;
+    }
+    case NodeKind::TestFail: {
+      indent(std::cout, depth + 1);
+      std::cout << utils::red() << "\xE2\x9C\x97 " << utils::reset() << n.Name;
+      appendDuration(std::cout, n.Duration);
+      std::cout << "\n";
+      indent(std::cout, depth + 2);
+      std::cout << utils::red() << n.Message << utils::reset() << "\n";
+      break;
+    }
+    case NodeKind::TestSkip: {
+      indent(std::cout, depth + 1);
+      std::cout << utils::yellow() << "\xE2\x97\x8B " << utils::reset()
+                << utils::gray() << "skipped " << n.Name << utils::reset()
+                << "\n";
+      break;
+    }
+    case NodeKind::HookError: {
+      indent(std::cout, depth + 1);
+      std::cout << utils::red() << n.Name << " threw"
+                << (n.SuiteName.empty() ? "" : " in \"" + n.SuiteName + "\"")
+                << ": " << n.Message << utils::reset() << "\n";
+      break;
+    }
+    }
+  }
+
+  void printBanner(const FileRecord &file) const {
+    bool failed = file.FailedCount > 0 || file.HookErrorCount > 0;
+    if (failed) {
+      std::cout << utils::bold() << utils::black() << utils::bgRed() << " FAIL "
+                << utils::reset() << " " << utils::bold() << file.Path
+                << utils::reset() << "\n";
+    } else {
+      std::cout << utils::bold() << utils::black() << utils::bgGreen()
+                << " PASS " << utils::reset() << " " << utils::bold()
+                << file.Path << utils::reset() << "\n";
+    }
+  }
+
   static void appendDuration(std::ostream &os,
                              std::chrono::nanoseconds duration) {
     auto ms =
         std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
-    // Jest only shows the timing if it's >= 1 ms, which keeps fast tests
-    // visually clean.
     if (ms >= 1) {
       os << " " << utils::gray() << "(" << ms << " ms)" << utils::reset();
     }
@@ -262,7 +348,6 @@ private:
 
   void printSummaryJestStyle(int passed, int failed, int skipped,
                              long long elapsedMs) {
-    // Test Suites line.
     std::cout << utils::bold() << "Test Suites: " << utils::reset();
     if (FilesFailed)
       std::cout << utils::red() << utils::bold() << FilesFailed << " failed"
@@ -272,7 +357,6 @@ private:
                 << utils::reset() << ", ";
     std::cout << (FilesPassed + FilesFailed) << " total\n";
 
-    // Tests line.
     std::cout << utils::bold() << "Tests:       " << utils::reset();
     if (failed)
       std::cout << utils::red() << utils::bold() << failed << " failed"
@@ -285,11 +369,9 @@ private:
                 << utils::reset() << ", ";
     std::cout << (passed + failed + skipped) << " total\n";
 
-    // Snapshots (always 0 for now — Cest doesn't have snapshots).
     std::cout << utils::bold() << "Snapshots:   " << utils::reset()
               << "0 total\n";
 
-    // Time. Jest also appends ", estimated <ceil> s" — we mimic that.
     double seconds = static_cast<double>(elapsedMs) / 1000.0;
     long long estimated = static_cast<long long>(seconds + 0.999);
     if (estimated < 1)
@@ -340,7 +422,6 @@ private:
 
     std::cout << t << "\n";
 #else
-    // Fallback to Jest-style if tabulate isn't compiled in.
     printSummaryJestStyle(passed, failed, skipped, elapsedMs);
 #endif
   }

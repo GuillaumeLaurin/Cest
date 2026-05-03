@@ -6,5 +6,7 @@
   "maintainers": "Guillaume Laurin <glaurin451@gmail.com>",
   "license": "MIT",
   "supports": "!(uwp | arm | android | emscripten | osx | ios | xbox | freebsd | openbsd | wasm32)",
-  "dependencies": []
+  "dependencies": [
+    "tabulate"
+  ]
 }
