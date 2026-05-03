@@ -14,6 +14,7 @@ namespace utils {
 
 struct Suite {
   std::string Name;
+  std::string File;
   std::vector<TestCase> Tests;
   std::vector<Suite> Children;
   std::vector<Void> BeforeAll;
@@ -23,6 +24,7 @@ struct Suite {
   bool Skipped = false;
   bool Focussed = false;
   bool HasFocussedDescendant = false;
+  bool IsTestSuiteRoot = false;
 };
 
 } // namespace utils

@@ -16,6 +16,11 @@
 
 #include "cest/utils/colors.hpp"
 
+#include "cest/reporters/i_reporter.hpp"
+
+#include "cest/reporters/console_reporter.hpp"
+
+#include <chrono>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -24,6 +29,7 @@
 #include <exception>
 #include <functional>
 #include <iostream>
+#include <memory>
 #include <optional>
 #include <regex>
 #include <sstream>
@@ -535,6 +541,23 @@ public:
     return r;
   }
 
+  /**
+   * @brief Add a reporter that will receive run events. Multiple reporters
+   *        can be active simultaneously — they are called in registration
+   *        order.
+   *
+   * If no reporter is added, run() automatically installs a
+   * ConsoleReporter so existing user code keeps working.
+   */
+  void addReporter(std::shared_ptr<reporters::IReporter> reporter) {
+    Reporters.push_back(std::move(reporter));
+  }
+
+  /**
+   * @brief Remove all registered reporters.
+   */
+  void clearReporters() { Reporters.clear(); }
+
   void beginDescribe(const std::string &name) {
     utils::Suite s;
     s.Name = name;
@@ -550,6 +573,44 @@ public:
     utils::Suite s = std::move(Stack.back());
     Stack.pop_back();
     currentSuite().Children.push_back(std::move(s));
+  }
+
+  /**
+   * @brief Called by the TEST_SUITE() macro before invoking the user's body.
+   *        Records where new top-level suites are about to land so we can
+   *        wrap them on endTestSuiteFile().
+   */
+  void beginTestSuiteFile(const std::string &file) {
+    TestSuiteFileStack.push_back(file);
+    TestSuiteRootMarkers.push_back(Root.Children.size());
+  }
+
+  /**
+   * @brief Called by the TEST_SUITE() macro after the user's body has run.
+   *        Wraps every suite that was just appended to Root into a single
+   *        synthetic Suite (IsTestSuiteRoot=true, File set), so reporters
+   *        can render one PASS/FAIL banner per file.
+   */
+  void endTestSuiteFile() {
+    std::size_t startIdx = TestSuiteRootMarkers.back();
+    TestSuiteRootMarkers.pop_back();
+    std::string file = TestSuiteFileStack.back();
+    TestSuiteFileStack.pop_back();
+
+    utils::Suite wrapper;
+    wrapper.File = std::move(file);
+    wrapper.IsTestSuiteRoot = true;
+    for (std::size_t i = startIdx; i < Root.Children.size(); ++i) {
+      wrapper.Children.push_back(std::move(Root.Children[i]));
+      // Propagate skip/focus from the children up so that focus detection
+      // continues to work at the wrapper level.
+      if (wrapper.Children.back().Focussed ||
+          wrapper.Children.back().HasFocussedDescendant) {
+        wrapper.HasFocussedDescendant = true;
+      }
+    }
+    Root.Children.resize(startIdx);
+    Root.Children.push_back(std::move(wrapper));
   }
 
   void addTest(const std::string &name, Void function) {
@@ -583,31 +644,40 @@ public:
   }
 
   int run() {
+    if (Reporters.empty()) {
+      Reporters.push_back(std::make_shared<reporters::ConsoleReporter>());
+    }
+
     Passed = Failed = Skipped = 0;
+    HookErrorCount = 0;
     HasFocus = false;
     dryRun(Root);
+
+    for (const auto &r : Reporters)
+      r->onRunStart(/*seed=*/0, /*passed=*/true);
+
     if (HasFocus) {
-      std::cout << "\n"
-                << utils::bold() << utils::yellow() << "Focus mode activated"
-                << utils::reset() << "\n"
-                << utils::yellow() << "Don't forget to turn it off"
-                << utils::reset() << "\n";
+      for (const auto &r : Reporters)
+        r->onFocussed();
     }
+
     runSuite(Root, 0, {}, {});
-    std::cout << "\n"
-              << utils::bold() << "Results: " << utils::green() << Passed
-              << " passed" << utils::reset() << ", "
-              << (Failed ? utils::red() : utils::gray()) << Failed << " failed"
-              << utils::reset() << ", "
-              << (Skipped ? utils::yellow() : utils::gray()) << Skipped
-              << " skipped" << utils::reset() << "\n";
-    return Failed == 0 ? 0 : 1;
+
+    for (const auto &r : Reporters)
+      r->onRunEnd(Passed, Failed, Skipped);
+
+    return (Failed == 0 && HookErrorCount == 0) ? 0 : 1;
   }
 
 private:
   utils::Suite Root;
   std::vector<utils::Suite> Stack;
+  std::vector<std::shared_ptr<reporters::IReporter>> Reporters;
+  std::vector<std::string> TestSuiteFileStack;
+  std::vector<std::size_t> TestSuiteRootMarkers;
+
   int Passed = 0, Failed = 0, Skipped = 0;
+  int HookErrorCount = 0;
   bool HasFocus = false;
 
   Runner() {
@@ -620,10 +690,34 @@ private:
 
   using HookList = std::vector<Void>;
 
-  void indent(int d) {
-    for (int i = 0; i < d; ++i) {
-      std::cout << "  ";
+  /// Run every hook in `hooks`. If any throw, dispatch onHookError to all
+  /// reporters and return false. The first failure's message is written to
+  /// `errOut`.
+  bool runHooks(const HookList &hooks, const utils::Suite &owner,
+                const std::string &hookName, std::string &errOut) {
+    bool ok = true;
+    for (const auto &h : hooks) {
+      try {
+        h();
+      } catch (const std::exception &e) {
+        std::string msg = e.what();
+        if (ok)
+          errOut = hookName + " threw: " + msg;
+        for (const auto &r : Reporters)
+          r->onHookError(owner, hookName, msg);
+        ok = false;
+        ++HookErrorCount;
+      } catch (...) {
+        std::string msg = "unknown throw";
+        if (ok)
+          errOut = hookName + " threw: " + msg;
+        for (const auto &r : Reporters)
+          r->onHookError(owner, hookName, msg);
+        ok = false;
+        ++HookErrorCount;
+      }
     }
+    return ok;
   }
 
   void runSuite(const utils::Suite &s, int depth, HookList inheritedBeforeEach,
@@ -631,141 +725,125 @@ private:
     if (HasFocus && !s.Focussed && !s.HasFocussedDescendant) {
       return;
     }
-    if (!s.Name.empty()) {
-      indent(depth);
-      if (s.Skipped) {
-        std::cout << utils::bold() << utils::yellow() << s.Name
-                  << utils::reset() << "\n";
-      } else {
-        std::cout << utils::bold() << s.Name << utils::reset() << "\n";
-      }
+
+    // Notify reporters that we're entering this suite. The synthetic Root
+    // suite (no name, no IsTestSuiteRoot) is silent — we don't fire events
+    // for it because reporters don't need to know about it.
+    bool isReportable = !s.Name.empty() || s.IsTestSuiteRoot;
+    if (isReportable) {
+      for (const auto &r : Reporters)
+        r->onSuiteStart(s, depth);
     }
 
-    int d = s.Name.empty() ? depth : depth + 1;
+    int childDepth = isReportable ? depth + 1 : depth;
+    // The IsTestSuiteRoot wrapper is transparent to indentation: its children
+    // appear at the same logical depth as if the wrapper didn't exist.
+    if (s.IsTestSuiteRoot)
+      childDepth = depth;
 
+    // beforeAll
+    std::string hookErr;
     if (!s.Skipped) {
-      for (const auto &h : s.BeforeAll) {
-        try {
-          h();
-        } catch (const std::exception &e) {
-          indent(d);
-          std::cout << utils::red() << "beforeAll threw: " << e.what()
-                    << utils::reset() << "\n";
-        }
-      }
+      runHooks(s.BeforeAll, s, "beforeAll", hookErr);
     }
 
-    HookList effectiveBefore;
+    // Build the per-test hook chains.
+    HookList effectiveBefore = inheritedBeforeEach;
     HookList effectiveAfter;
-
     if (!s.Skipped) {
-      effectiveBefore = inheritedBeforeEach;
       for (const auto &h : s.BeforeEach)
         effectiveBefore.push_back(h);
-
       for (const auto &h : s.AfterEach)
         effectiveAfter.push_back(h);
-      for (const auto &h : inheritedAfterEach)
-        effectiveAfter.push_back(h);
     }
+    for (const auto &h : inheritedAfterEach)
+      effectiveAfter.push_back(h);
 
+    // Tests
     for (const auto &t : s.Tests) {
-      if (HasFocus && !s.Skipped && !s.Focussed) {
+      if (HasFocus && !s.Skipped && !s.Focussed && !t.Focussed) {
         continue;
       }
 
-      indent(d);
+      if (t.Skipped) {
+        for (const auto &r : Reporters)
+          r->onTestSkip(t);
+        ++Skipped;
+        continue;
+      }
+
       bool ok = true;
       std::string errMsg;
-      bool assertionErr = false;
+      std::string beforeEachErr;
 
-      if (!t.Skipped) {
+      if (!runHooks(effectiveBefore, s, "beforeEach", beforeEachErr)) {
+        ok = false;
+        errMsg = beforeEachErr;
+      }
 
-        for (const auto &h : effectiveBefore) {
-          try {
-            h();
-          } catch (const std::exception &e) {
-            ok = false;
-            errMsg = std::string("beforeEach threw: ") + e.what();
-            break;
-          }
+      auto start = std::chrono::steady_clock::now();
+      if (ok) {
+        try {
+          t.Function();
+        } catch (const AssertionError &e) {
+          ok = false;
+          errMsg = e.what();
+        } catch (const std::exception &e) {
+          ok = false;
+          errMsg = std::string("threw: ") + e.what();
+        } catch (...) {
+          ok = false;
+          errMsg = "unknown throw";
         }
+      }
+      auto end = std::chrono::steady_clock::now();
+      auto duration =
+          std::chrono::duration_cast<std::chrono::nanoseconds>(end - start);
 
+      std::string afterEachErr;
+      if (!runHooks(effectiveAfter, s, "afterEach", afterEachErr)) {
         if (ok) {
-          try {
-            t.Function();
-          } catch (const AssertionError &e) {
-            ok = false;
-            assertionErr = true;
-            errMsg = e.what();
-          } catch (const std::exception &e) {
-            ok = false;
-            errMsg = std::string("threw: ") + e.what();
-          } catch (...) {
-            ok = false;
-            errMsg = "unknown throw";
-          }
-        }
-
-        for (const auto &h : effectiveAfter) {
-          try {
-            h();
-          } catch (const std::exception &e) {
-            if (ok) {
-              ok = false;
-              errMsg = std::string("afterEach threw: ") + e.what();
-            }
-          }
+          ok = false;
+          errMsg = afterEachErr;
         }
       }
 
-      if (t.Skipped) {
-        std::cout << utils::yellow() << "Skipped " << t.Name << utils::reset()
-                  << "\n";
-        ++Skipped;
-      } else if (ok) {
-        std::cout << utils::green() << "\xE2\x9C\x93 " << utils::reset()
-                  << t.Name << "\n";
+      if (ok) {
+        for (const auto &r : Reporters)
+          r->onTestPass(t, duration);
         ++Passed;
       } else {
-        std::cout << utils::red() << "\xE2\x9C\x97 " << t.Name << utils::reset()
-                  << "\n";
-        indent(d + 1);
-        std::cout << utils::red() << errMsg << utils::reset() << "\n";
+        for (const auto &r : Reporters)
+          r->onTestFail(t, errMsg, duration);
         ++Failed;
-        (void)assertionErr;
       }
     }
 
-    // Recurse into children with extended hook chains if suite is not skipped.
-    HookList childBefore;
+    // Children
+    HookList childBefore = inheritedBeforeEach;
     HookList childAfter;
-
     if (!s.Skipped) {
-      childBefore = inheritedBeforeEach;
       for (const auto &h : s.BeforeEach)
         childBefore.push_back(h);
-
       for (const auto &h : s.AfterEach)
         childAfter.push_back(h);
-      for (const auto &h : inheritedAfterEach)
-        childAfter.push_back(h);
     }
+    for (const auto &h : inheritedAfterEach)
+      childAfter.push_back(h);
 
     for (const auto &c : s.Children) {
-      runSuite(c, d, childBefore, childAfter);
+      runSuite(c, childDepth, childBefore, childAfter);
     }
 
+    // afterAll
     if (!s.Skipped) {
-      for (const auto &h : s.AfterAll) {
-        try {
-          h();
-        } catch (const std::exception &e) {
-          indent(d);
-          std::cout << utils::red() << "afterAll threw: " << e.what()
-                    << utils::reset() << "\n";
-        }
-      }
+      std::string afterAllErr;
+      runHooks(s.AfterAll, s, "afterAll", afterAllErr);
+    }
+
+    if (isReportable) {
+      for (const auto &r : Reporters)
+        r->onSuiteEnd(s, depth);
     }
   }
 
@@ -782,7 +860,7 @@ private:
       }
     }
 
-    for (auto test : s.Tests) {
+    for (auto &test : s.Tests) {
       if (test.Focussed) {
         HasFocus = true;
         s.HasFocussedDescendant = true;
@@ -874,8 +952,9 @@ inline void afterEach(Void function) {
   namespace {                                                                  \
   struct CEST_CAT(CestSuiteReg_, __LINE__) {                                   \
     CEST_CAT(CestSuiteReg_, __LINE__)() {                                      \
-      ::cest::Runner::instance();                                              \
+      ::cest::Runner::instance().beginTestSuiteFile(__FILE__);                 \
       CEST_CAT(cest_suite_fn_, __LINE__)();                                    \
+      ::cest::Runner::instance().endTestSuiteFile();                           \
     }                                                                          \
   };                                                                           \
   static CEST_CAT(CestSuiteReg_, __LINE__)                                     \
@@ -886,11 +965,9 @@ inline void afterEach(Void function) {
 
 #define CEST_MATCHER(Name, Type, Predicate, Description)                       \
   struct CEST_CAT(Tag_, Name) {};                                              \
-  namespace cest::detail {                                                     \
+  namespace cest {                                                             \
   template <>                                                                  \
   struct has_matcher<Type, CEST_CAT(Tag_, Name)> : std::true_type {};          \
-  }                                                                            \
-  namespace cest {                                                             \
   class CEST_CAT(Expectation, Name) : public Expectation<Type> {               \
   public:                                                                      \
     CEST_CAT(Expectation, Name)(Type value, bool negated = false)              \
