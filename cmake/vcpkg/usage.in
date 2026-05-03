@@ -1,4 +1,19 @@
 The @CEST_PORT@ port provides the following CMake targets:
 
-find_package(@Cest_ns@ @cestPackageVersion@ CONFIG REQUIRED)
-target_link_libraries(main PRIVATE @Cest_ns@::@Cest_target@)
+  find_package(@Cest_ns@ @cestPackageVersion@ CONFIG REQUIRED)
+
+  # Core — Tier A mocking with MockFn (fully portable)
+  target_link_libraries(main PRIVATE @Cest_ns@::@Cest_target@)
+
+  # Mock — Tier B hot-patching, no annotations required
+  target_link_libraries(main PRIVATE @Cest_ns@::Mock)
+
+  # MockStrict — Tier B hot-patching, requires CEST_MOCKABLE annotations
+  target_link_libraries(main PRIVATE @Cest_ns@::MockStrict)
+
+@Cest_ns@::Mock and @Cest_ns@::MockStrict transitively link
+@Cest_ns@::@Cest_target@, so you do not need to list the core target
+twice.
+
+Hot-patching (Tier B) is supported on Linux and Windows in Debug builds.
+For macOS or Release builds, use Tier A (MockFn) instead.
